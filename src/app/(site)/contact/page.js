@@ -10,7 +10,15 @@ export const metadata = {
 };
 
 export default function ContactPage() {
-  const store = getStore();
+  const store = {
+    business: {
+      name: "Odinaka Solar Tech",
+      whatsapp: "2348000000000",
+      location: "Lagos, Nigeria",
+      hours: "Mon - Sat",
+      phone: "08000000000",
+    },
+  };
   const wa = whatsappLink({
     phone: store.business.whatsapp,
     message: `Hello ${store.business.name}, I need a solar quote.`,
