@@ -1,0 +1,59 @@
+﻿{
+  "business": {
+    "name": "Odinaka Solar Tech",
+    "tagline": "Premium solar products & installation materials for homes, SMEs, estates.",
+    "whatsapp": "+2349063225927",
+    "phone": "+2349063225927",
+    "location": "Lagos, Nigeria",
+    "hours": "Mon–Sat 8:00–18:00",
+    "domain": "https://YOURDOMAIN.com",
+    "heroImage": "/images/hero/hero-solar-rooftop.jpg"
+  },
+  "categories": [
+    { "id": "solar-panels", "name": "Solar Panels" },
+    { "id": "inverters", "name": "Inverters" },
+    { "id": "batteries", "name": "Batteries" },
+    { "id": "charge-controllers", "name": "Charge Controllers" },
+    { "id": "cables-breakers", "name": "Cables & Breakers" },
+    { "id": "lights-bulbs", "name": "Lights & Bulbs" },
+    { "id": "accessories", "name": "Accessories" }
+  ],
+  "products": [
+    {
+      "id": "mono-panel-550w",
+      "name": "Monocrystalline Solar Panel 550W",
+      "categoryId": "solar-panels",
+      "brand": "Premium Series",
+      "priceNGN": 0,
+      "priceNote": "Request price",
+      "inStock": true,
+      "images": ["/images/products/sample-panel-1.jpg"],
+      "short": "High-efficiency mono panel for residential and commercial systems.",
+      "specs": ["550W", "Mono PERC", "High-durability frame"],
+      "keywords": [
+        "solar panel 550w nigeria",
+        "mono solar panel lagos",
+        "solar panels nigeria"
+      ],
+      "featured": true
+    },
+    {
+      "id": "hybrid-inverter-5kva",
+      "name": "Hybrid Inverter 5kVA",
+      "categoryId": "inverters",
+      "brand": "HybridPro",
+      "priceNGN": 0,
+      "priceNote": "Request price",
+      "inStock": true,
+      "images": ["/images/products/sample-inverter-1.jpg"],
+      "short": "Stable hybrid inverter for home + SME power backup.",
+      "specs": ["5kVA", "Hybrid", "Pure sine wave"],
+      "keywords": [
+        "5kva inverter nigeria",
+        "hybrid inverter lagos",
+        "solar inverter dealer"
+      ],
+      "featured": true
+    }
+  ]
+}
