@@ -141,13 +141,13 @@ function StatCard({ title, qty, amount, onClick }) {
     <button
       onClick={onClick}
       className={cx(
-        "text-left rounded-2xl border border-white/10 bg-white/[0.06] p-4 transition hover:bg-white/[0.09]",
+        "text-left rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:bg-slate-100",
         onClick ? "cursor-pointer" : "cursor-default",
       )}
     >
-      <div className="text-xs text-white/60">{title}</div>
+      <div className="text-xs text-slate-500">{title}</div>
       <div className="mt-2 text-2xl font-bold">{qty}</div>
-      <div className="mt-1 text-sm text-white/70">{money(amount)}</div>
+      <div className="mt-1 text-sm text-slate-600">{money(amount)}</div>
     </button>
   );
 }
@@ -238,11 +238,11 @@ export default function OverviewPanel({ onGo }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
+      <div className="rounded-2xl border border-slate-200 bg-white/90 p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-lg font-bold">Overview</div>
-            <div className="text-sm text-white/60">
+            <div className="text-sm text-slate-600">
               Quick snapshot of orders, what people view, and what they search
               for.
             </div>
@@ -257,7 +257,7 @@ export default function OverviewPanel({ onGo }) {
                   "rounded-2xl px-4 py-2 text-sm font-semibold border border-white/10",
                   range === k
                     ? "bg-yellow-500 text-black"
-                    : "bg-white/[0.06] text-white hover:bg-white/[0.09]",
+                    : "bg-slate-50 text-slate-700 hover:bg-slate-100",
                 )}
               >
                 {k === "day"
@@ -298,7 +298,9 @@ export default function OverviewPanel({ onGo }) {
         </div>
 
         {loading ? (
-          <div className="mt-5 text-sm text-white/60">Loading analytics...</div>
+          <div className="mt-5 text-sm text-slate-600">
+            Loading analytics...
+          </div>
         ) : null}
       </div>
 
@@ -334,11 +336,11 @@ export default function OverviewPanel({ onGo }) {
 
 function Card({ title, subtitle, rows }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
+    <div className="rounded-2xl border border-slate-200 bg-white/90 p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-bold">{title}</div>
-          <div className="text-xs text-white/60">{subtitle}</div>
+          <div className="text-xs text-slate-500">{subtitle}</div>
         </div>
       </div>
 
@@ -347,14 +349,16 @@ function Card({ title, subtitle, rows }) {
           rows.map((r, i) => (
             <div
               key={i}
-              className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/25 px-3 py-2"
+              className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
             >
-              <div className="text-sm text-white/85 line-clamp-1">{r.left}</div>
-              <div className="text-xs text-white/60">{r.right}</div>
+              <div className="text-sm text-slate-700 line-clamp-1">
+                {r.left}
+              </div>
+              <div className="text-xs text-slate-500">{r.right}</div>
             </div>
           ))
         ) : (
-          <div className="text-sm text-white/60">No data yet.</div>
+          <div className="text-sm text-slate-600">No data yet.</div>
         )}
       </div>
     </div>

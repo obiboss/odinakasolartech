@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { MessageCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
 function cx(...a) {
@@ -234,26 +235,26 @@ export default function ChatWidget() {
         className={cx(
           "fixed bottom-5 right-5 z-[80] rounded-full",
           "bg-yellow-500 text-black shadow-[0_18px_60px_rgba(0,0,0,0.45)]",
-          "h-14 w-14 font-bold",
+          "h-14 w-14",
         )}
         aria-label="Chat"
       >
-        Chat
+        <MessageCircle className="h-6 w-6" />
       </button>
 
       {/* panel */}
       {open && (
-        <div className="fixed bottom-24 right-5 z-[80] w-[92vw] max-w-[420px] overflow-hidden rounded-2xl border border-white/10 bg-[#070a0f] text-white shadow-[0_18px_60px_rgba(0,0,0,0.55)]">
-          <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.06] px-4 py-3">
+        <div className="fixed bottom-24 right-5 z-[80] w-[92vw] max-w-[420px] overflow-hidden rounded-2xl border border-slate-200 bg-white/90 text-slate-900 shadow-[0_18px_60px_rgba(0,0,0,0.15)]">
+          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-100 px-4 py-3">
             <div>
               <div className="text-sm font-bold">Support Chat</div>
-              <div className="text-[11px] text-white/60">
+              <div className="text-[11px] text-slate-500">
                 Reply time depends on availability
               </div>
             </div>
             <button
               onClick={() => setOpen(false)}
-              className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-semibold hover:bg-white/[0.09]"
+              className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold hover:bg-slate-200"
             >
               Close
             </button>
@@ -267,7 +268,7 @@ export default function ChatWidget() {
             ) : null}
 
             {messages.length === 0 && !bootError ? (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white/70">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                 Ask a question or upload payment proof.
               </div>
             ) : null}
@@ -291,7 +292,7 @@ export default function ChatWidget() {
                         "max-w-[85%] rounded-2xl px-3 py-2 text-sm",
                         isMe
                           ? "bg-yellow-500 text-black"
-                          : "bg-white/[0.07] text-white",
+                          : "bg-slate-50 text-slate-700",
                       )}
                     >
                       {m.content ? <div>{m.content}</div> : null}
@@ -302,7 +303,7 @@ export default function ChatWidget() {
                             <a
                               className={cx(
                                 "underline text-xs",
-                                isMe ? "text-black/80" : "text-white/80",
+                                isMe ? "text-black/80" : "text-slate-600",
                               )}
                               href={signed}
                               target="_blank"
@@ -327,10 +328,10 @@ export default function ChatWidget() {
 
           <form
             onSubmit={sendMessage}
-            className="border-t border-white/10 bg-black/20 p-3"
+            className="border-t border-slate-200 bg-slate-50 p-3"
           >
             <div className="flex gap-2">
-              <label className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-semibold hover:bg-white/[0.09]">
+              <label className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold hover:bg-slate-100">
                 File
                 <input
                   type="file"
@@ -343,11 +344,11 @@ export default function ChatWidget() {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 placeholder="Type your message..."
-                className="flex-1 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm outline-none"
+                className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
               />
-
               <button
-                disabled={!canSend}
+                type="submit"
+                disabled={busy}
                 className="rounded-xl bg-yellow-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
               >
                 {busy ? "..." : "Send"}
@@ -355,7 +356,7 @@ export default function ChatWidget() {
             </div>
 
             {file ? (
-              <div className="mt-2 text-xs text-white/70">
+              <div className="mt-2 text-xs text-slate-500">
                 Selected: {file.name}{" "}
                 <button
                   type="button"

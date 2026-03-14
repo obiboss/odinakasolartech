@@ -24,8 +24,8 @@ export default function Filters({ categories }) {
           onClick={() => setParam("cat", "")}
           className={`rounded-2xl px-3 py-2 text-sm border transition ${
             !cat
-              ? "bg-white/10 border-white/15"
-              : "bg-black/20 border-white/10 hover:bg-black/30"
+              ? "bg-amber-500/20 border-amber-500/30 text-amber-900"
+              : "bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700"
           }`}
         >
           All
@@ -36,8 +36,8 @@ export default function Filters({ categories }) {
             onClick={() => setParam("cat", c.id)}
             className={`rounded-2xl px-3 py-2 text-sm border transition ${
               cat === c.id
-                ? "bg-white/10 border-white/15"
-                : "bg-black/20 border-white/10 hover:bg-black/30"
+                ? "bg-amber-500/20 border-amber-500/30 text-amber-900"
+                : "bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700"
             }`}
           >
             {c.name}

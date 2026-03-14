@@ -97,6 +97,9 @@ export default function Header() {
               >
                 Deals
               </Link>
+              <Link href="/cart" className="hover:text-slate-900 transition">
+                Cart
+              </Link>
               <Link href="/contact" className="hover:text-slate-900 transition">
                 Support
               </Link>
@@ -144,6 +147,9 @@ export default function Header() {
             <div className="flex items-center gap-2 shrink-0">
               <Button as={Link} href="/shop" variant="ghost" className="px-3">
                 Shop
+              </Button>
+              <Button as={Link} href="/cart" variant="ghost" className="px-3">
+                Cart
               </Button>
 
               <Button

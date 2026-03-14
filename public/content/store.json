@@ -7,7 +7,12 @@
     "location": "Lagos, Nigeria",
     "hours": "Mon–Sat 8:00–18:00",
     "domain": "https://YOURDOMAIN.com",
-    "heroImage": "/images/hero/hero-solar-rooftop.jpg"
+    "heroImage": "/images/hero/hero-solar-rooftop.jpg",
+    "bank": {
+      "name": "Your Bank Name",
+      "accountName": "Your Account Name",
+      "accountNumber": "0000000000"
+    }
   },
   "categories": [
     { "id": "solar-panels", "name": "Solar Panels" },

@@ -10,6 +10,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+
+    // Ignore backup worktrees that may contain unfinished/broken code
+    "_backup_src_*/**",
   ]),
 ]);
 

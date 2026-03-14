@@ -35,6 +35,7 @@ export default function PromosPanel() {
     setLoading(false);
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     load();
   }, []);
@@ -83,26 +84,26 @@ export default function PromosPanel() {
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
+    <div className="rounded-2xl border border-slate-200 bg-white/90 p-5">
       <h3 className="text-lg font-bold">Promos</h3>
-      <p className="mt-1 text-sm text-white/70">
+      <p className="mt-1 text-sm text-slate-600">
         Create a banner promo (you can keep only one active).
       </p>
 
       {err && (
-        <div className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <div className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-700">
           {err}
         </div>
       )}
 
       <div className="mt-5 grid gap-4 lg:grid-cols-12">
         <div className="lg:col-span-5">
-          <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+          <div className="rounded-2xl border border-slate-200 bg-white/90 p-4">
             <div className="text-sm font-semibold">New promo</div>
 
             <div className="mt-3 grid gap-3">
               <input
-                className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-yellow-500/30"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500/30"
                 placeholder="Title (e.g. Launch Promo)"
                 value={form.title}
                 onChange={(e) =>
@@ -110,7 +111,7 @@ export default function PromosPanel() {
                 }
               />
               <input
-                className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-yellow-500/30"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500/30"
                 placeholder="Subtitle (e.g. Bundle panels + inverter...)"
                 value={form.subtitle}
                 onChange={(e) =>
@@ -120,7 +121,7 @@ export default function PromosPanel() {
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <input
-                  className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-yellow-500/30"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500/30"
                   type="datetime-local"
                   value={form.starts}
                   onChange={(e) =>
@@ -128,7 +129,7 @@ export default function PromosPanel() {
                   }
                 />
                 <input
-                  className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-yellow-500/30"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500/30"
                   type="datetime-local"
                   value={form.ends}
                   onChange={(e) =>
@@ -137,7 +138,7 @@ export default function PromosPanel() {
                 />
               </div>
 
-              <label className="flex items-center gap-2 text-sm text-white/80">
+              <label className="flex items-center gap-2 text-sm text-slate-700">
                 <input
                   type="checkbox"
                   checked={form.active}
@@ -163,13 +164,13 @@ export default function PromosPanel() {
         </div>
 
         <div className="lg:col-span-7">
-          <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+          <div className="rounded-2xl border border-slate-200 bg-white/90 p-4">
             <div className="text-sm font-semibold">Existing promos</div>
 
             {loading ? (
-              <div className="mt-4 text-sm text-white/70">Loading…</div>
+              <div className="mt-4 text-sm text-slate-600">Loading…</div>
             ) : promos.length === 0 ? (
-              <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white/70">
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                 No promos yet.
               </div>
             ) : (
@@ -177,7 +178,7 @@ export default function PromosPanel() {
                 {promos.map((p) => (
                   <div
                     key={p.id}
-                    className="rounded-2xl border border-white/10 bg-white/[0.06] p-4"
+                    className="rounded-2xl border border-slate-200 bg-white/90 p-4"
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
@@ -186,15 +187,15 @@ export default function PromosPanel() {
                             {p.title || "Untitled promo"}
                           </div>
                           {p.active && (
-                            <span className="rounded-full border border-yellow-500/30 bg-yellow-500/15 px-2 py-0.5 text-xs font-semibold text-yellow-100">
+                            <span className="rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-900">
                               Active
                             </span>
                           )}
                         </div>
-                        <div className="mt-1 text-sm text-white/70">
+                        <div className="mt-1 text-sm text-slate-600">
                           {p.subtitle || "—"}
                         </div>
-                        <div className="mt-2 text-xs text-white/55">
+                        <div className="mt-2 text-xs text-slate-500">
                           Starts:{" "}
                           {p.starts ? new Date(p.starts).toLocaleString() : "—"}
                           {" • "}
@@ -209,15 +210,15 @@ export default function PromosPanel() {
                           className={cx(
                             "rounded-xl border px-3 py-2 text-sm font-semibold",
                             p.active
-                              ? "border-white/10 bg-white/[0.06] hover:bg-white/[0.09]"
-                              : "border-yellow-500/30 bg-yellow-500/15 text-yellow-100 hover:bg-yellow-500/20",
+                              ? "border-slate-200 bg-slate-50 hover:bg-slate-100"
+                              : "border-amber-500/30 bg-amber-500/15 text-amber-900 hover:bg-amber-500/20",
                           )}
                         >
                           {p.active ? "Deactivate" : "Activate"}
                         </button>
                         <button
                           onClick={() => remove(p.id)}
-                          className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-200 hover:bg-red-500/15"
+                          className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-500/15"
                         >
                           Delete
                         </button>

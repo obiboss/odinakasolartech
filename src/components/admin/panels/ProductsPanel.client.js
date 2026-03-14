@@ -67,6 +67,7 @@ export default function ProductsPanel() {
     setLoading(false);
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     loadAll();
   }, []);
@@ -208,7 +209,7 @@ export default function ProductsPanel() {
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h3 className="text-lg font-bold">Products</h3>
-        <p className="mt-1 text-sm text-white/70">
+        <p className="mt-1 text-sm text-slate-600">
           Add, edit, price and feature products.
         </p>
       </div>
@@ -216,7 +217,7 @@ export default function ProductsPanel() {
       {mode === "list" ? (
         <button
           onClick={startNew}
-          className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-semibold hover:bg-white/[0.09]"
+          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold hover:bg-slate-100"
         >
           + New product
         </button>
@@ -235,7 +236,7 @@ export default function ProductsPanel() {
     return (
       <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
         {header}
-        <div className="mt-5 text-sm text-white/70">Loading…</div>
+        <div className="mt-5 text-sm text-slate-600">Loading…</div>
       </div>
     );
   }
@@ -253,7 +254,7 @@ export default function ProductsPanel() {
       {mode === "list" && (
         <div className="mt-5">
           {products.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-4 text-sm text-white/70">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
               No products yet. Click <b>New product</b>.
             </div>
           ) : (
@@ -263,10 +264,10 @@ export default function ProductsPanel() {
                 return (
                   <div
                     key={p.id}
-                    className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/25 p-4 sm:flex-row sm:items-center sm:justify-between"
+                    className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/90 p-4 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="h-12 w-12 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+                      <div className="h-12 w-12 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                         {img ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -285,7 +286,7 @@ export default function ProductsPanel() {
                             </span>
                           )}
                         </div>
-                        <div className="mt-0.5 text-xs text-white/60">
+                        <div className="mt-0.5 text-xs text-slate-500">
                           URL name:{" "}
                           <span className="font-semibold">{p.slug}</span>
                           {" • "}
@@ -322,17 +323,17 @@ export default function ProductsPanel() {
       {(mode === "new" || mode === "edit") && (
         <div className="mt-5 grid gap-4 lg:grid-cols-12">
           <div className="lg:col-span-7">
-            <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+            <div className="rounded-2xl border border-slate-200 bg-white/90 p-4">
               <div className="text-sm font-semibold">
                 {mode === "new" ? "New product" : "Edit product"}
               </div>
-              <div className="mt-1 text-xs text-white/60">
+              <div className="mt-1 text-xs text-slate-500">
                 “URL name” is used in the link (good for SEO). Keep it short.
               </div>
 
               <div className="mt-4 grid gap-3">
                 <div>
-                  <label className="text-xs text-white/70">Product name</label>
+                  <label className="text-xs text-slate-600">Product name</label>
                   <input
                     value={form.name}
                     onChange={(e) =>
@@ -344,13 +345,13 @@ export default function ProductsPanel() {
                           : slugify(e.target.value),
                       }))
                     }
-                    className="mt-1 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-yellow-500/30"
+                    className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500/30"
                     placeholder="e.g. Monocrystalline Solar Panel 550W"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs text-white/70">URL name</label>
+                  <label className="text-xs text-slate-600">URL name</label>
                   <input
                     value={form.urlName}
                     onChange={(e) =>
@@ -359,14 +360,14 @@ export default function ProductsPanel() {
                         urlName: slugify(e.target.value),
                       }))
                     }
-                    className="mt-1 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-yellow-500/30"
+                    className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500/30"
                     placeholder="e.g. mono-panel-550w"
                   />
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="text-xs text-white/70">
+                    <label className="text-xs text-slate-600">
                       Price (NGN) — leave empty for “Request price”
                     </label>
                     <input
@@ -374,20 +375,20 @@ export default function ProductsPanel() {
                       onChange={(e) =>
                         setForm((s) => ({ ...s, price: e.target.value }))
                       }
-                      className="mt-1 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-yellow-500/30"
+                      className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500/30"
                       placeholder="e.g. 250000"
                       inputMode="numeric"
                     />
                   </div>
 
                   <div>
-                    <label className="text-xs text-white/70">Category</label>
+                    <label className="text-xs text-slate-600">Category</label>
                     <select
                       value={form.category_id}
                       onChange={(e) =>
                         setForm((s) => ({ ...s, category_id: e.target.value }))
                       }
-                      className="mt-1 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-yellow-500/30"
+                      className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500/30"
                     >
                       <option value="">No category</option>
                       {categories.map((c) => (
@@ -400,18 +401,18 @@ export default function ProductsPanel() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-white/70">Description</label>
+                  <label className="text-xs text-slate-600">Description</label>
                   <textarea
                     value={form.description}
                     onChange={(e) =>
                       setForm((s) => ({ ...s, description: e.target.value }))
                     }
-                    className="mt-1 min-h-[120px] w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-yellow-500/30"
+                    className="mt-1 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500/30"
                     placeholder="Write a clean, buyer-friendly description."
                   />
                 </div>
 
-                <label className="flex items-center gap-2 text-sm text-white/80">
+                <label className="flex items-center gap-2 text-sm text-slate-700">
                   <input
                     type="checkbox"
                     checked={form.featured}
@@ -438,9 +439,9 @@ export default function ProductsPanel() {
           </div>
 
           <div className="lg:col-span-5">
-            <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+            <div className="rounded-2xl border border-slate-200 bg-white/90 p-4">
               <div className="text-sm font-semibold">Images</div>
-              <div className="mt-1 text-xs text-white/60">
+              <div className="mt-1 text-xs text-slate-500">
                 Save the product first, then upload images.
               </div>
 
@@ -454,7 +455,7 @@ export default function ProductsPanel() {
                     if (f) uploadImage(f);
                     e.target.value = "";
                   }}
-                  className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
                 />
               </div>
 
@@ -462,7 +463,7 @@ export default function ProductsPanel() {
                 {(editingProduct?.product_images || []).map((img) => (
                   <div
                     key={img.image_url}
-                    className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5"
+                    className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -472,7 +473,7 @@ export default function ProductsPanel() {
                     />
                     <button
                       onClick={() => removeImage(editingId, img.image_url)}
-                      className="absolute right-2 top-2 rounded-xl border border-red-500/25 bg-red-500/10 px-2 py-1 text-xs font-semibold text-red-200 hover:bg-red-500/15"
+                      className="absolute right-2 top-2 rounded-xl border border-red-500/25 bg-red-500/10 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-500/15"
                     >
                       Remove
                     </button>
@@ -482,15 +483,15 @@ export default function ProductsPanel() {
 
               {editingId &&
               (editingProduct?.product_images || []).length === 0 ? (
-                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white/70">
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                   No images yet.
                 </div>
               ) : null}
             </div>
 
-            <div className="mt-4 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 text-sm text-yellow-100/90">
+            <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-900">
               <div className="font-semibold">Photo tip</div>
-              <div className="mt-1 text-xs text-yellow-100/70">
+              <div className="mt-1 text-xs text-amber-800">
                 Use clean lighting and 4:3 product photos for best results.
               </div>
             </div>

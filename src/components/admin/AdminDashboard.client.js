@@ -31,11 +31,11 @@ export default function AdminDashboard() {
   return (
     <div className="w-full">
       <div className="flex flex-col gap-4">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
+        <div className="rounded-2xl border border-slate-200 bg-white/90 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-bold">Dashboard</h2>
-              <p className="mt-1 text-sm text-white/70">
+              <p className="mt-1 text-sm text-slate-600">
                 Switch panels without changing pages.
               </p>
             </div>
@@ -47,10 +47,10 @@ export default function AdminDashboard() {
                   onClick={() => setTab(t.id)}
                   className={cx(
                     "rounded-2xl px-4 py-2 text-sm font-semibold transition",
-                    "border border-white/10",
+                    "border border-slate-200",
                     tab === t.id
-                      ? "bg-yellow-500/20 text-yellow-100 border-yellow-500/30"
-                      : "bg-white/[0.06] text-white/80 hover:bg-white/[0.09]",
+                      ? "bg-amber-500/20 text-amber-900 border-amber-500/30"
+                      : "bg-slate-50 text-slate-700 hover:bg-slate-100",
                   )}
                 >
                   {t.label}

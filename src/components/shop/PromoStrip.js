@@ -25,7 +25,7 @@ export default function PromoStrip() {
         </span>
         <div>
           <div className="font-semibold">{p.title}</div>
-          <div className="text-sm text-white/70">{p.subtitle}</div>
+          <div className="text-sm text-slate-600">{p.subtitle}</div>
         </div>
       </div>
     </div>

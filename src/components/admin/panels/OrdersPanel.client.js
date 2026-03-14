@@ -89,18 +89,18 @@ export default function OrdersPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
+      <div className="rounded-2xl border border-slate-200 bg-white/90 p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-lg font-bold">Orders</div>
-            <div className="text-sm text-white/60">
+            <div className="text-sm text-slate-600">
               Track pending, confirmed, and expired orders.
             </div>
           </div>
 
           <button
             onClick={load}
-            className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-semibold hover:bg-white/[0.09]"
+            className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold hover:bg-slate-100"
           >
             Refresh
           </button>
@@ -113,10 +113,10 @@ export default function OrdersPanel() {
                 key={s.key}
                 onClick={() => setStatus(s.key)}
                 className={cx(
-                  "shrink-0 rounded-2xl px-4 py-2 text-sm font-semibold border border-white/10",
+                  "shrink-0 rounded-2xl px-4 py-2 text-sm font-semibold border border-slate-200",
                   status === s.key
-                    ? "bg-yellow-500 text-black"
-                    : "bg-white/[0.06] text-white hover:bg-white/[0.09]",
+                    ? "bg-amber-500 text-black"
+                    : "bg-slate-50 text-slate-700 hover:bg-slate-100",
                 )}
               >
                 {s.label}
@@ -125,7 +125,7 @@ export default function OrdersPanel() {
           </div>
 
           <input
-            className="w-full lg:w-[360px] rounded-2xl border border-white/10 bg-black/30 px-4 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-yellow-500/30"
+            className="w-full lg:w-[360px] rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500/30"
             placeholder="Search by order ID or phone"
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -133,7 +133,7 @@ export default function OrdersPanel() {
         </div>
 
         {err ? (
-          <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-700">
             {err}
           </div>
         ) : null}
@@ -141,19 +141,19 @@ export default function OrdersPanel() {
 
       <div className="grid grid-cols-1 gap-3">
         {loading ? (
-          <div className="text-sm text-white/60">Loading orders...</div>
+          <div className="text-sm text-slate-600">Loading orders...</div>
         ) : filtered.length ? (
           filtered.map((o) => (
             <div
               key={o.id}
-              className="rounded-2xl border border-white/10 bg-white/[0.06] p-4"
+              className="rounded-2xl border border-slate-200 bg-white/90 p-4"
             >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="text-sm font-bold">
-                    Order <span className="text-white/70">#{o.id}</span>
+                    Order <span className="text-slate-600">#{o.id}</span>
                   </div>
-                  <div className="mt-1 text-xs text-white/60">
+                  <div className="mt-1 text-xs text-slate-500">
                     {new Date(o.created_at).toLocaleString()} •{" "}
                     {o.customer_name || "Customer"} • {o.customer_phone || "—"}
                   </div>
@@ -164,10 +164,10 @@ export default function OrdersPanel() {
                     className={cx(
                       "rounded-full px-3 py-1 text-xs font-semibold border",
                       o.status === "confirmed"
-                        ? "border-green-500/30 bg-green-500/10 text-green-200"
+                        ? "border-green-500/30 bg-green-500/10 text-green-700"
                         : o.status === "expired"
-                          ? "border-red-500/30 bg-red-500/10 text-red-200"
-                          : "border-yellow-500/30 bg-yellow-500/10 text-yellow-100",
+                          ? "border-red-500/30 bg-red-500/10 text-red-700"
+                          : "border-amber-500/30 bg-amber-500/10 text-amber-900",
                     )}
                   >
                     {o.status || "pending"}
@@ -179,10 +179,10 @@ export default function OrdersPanel() {
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
-                <span className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white/70">
+                <span className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                   Payment: {o.payment_method || "Pay on delivery / Transfer"}
                 </span>
-                <span className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white/70">
+                <span className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                   Chat: {o.conversations?.length ? "Linked" : "Not linked"}
                 </span>
               </div>
@@ -196,13 +196,13 @@ export default function OrdersPanel() {
                 </button>
                 <button
                   onClick={() => setOrderStatus(o.id, "pending")}
-                  className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-semibold hover:bg-white/[0.09]"
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold hover:bg-slate-100"
                 >
                   Set pending
                 </button>
                 <button
                   onClick={() => setOrderStatus(o.id, "expired")}
-                  className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-200 hover:bg-red-500/15"
+                  className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-500/15"
                 >
                   Expire
                 </button>
@@ -210,7 +210,7 @@ export default function OrdersPanel() {
             </div>
           ))
         ) : (
-          <div className="text-sm text-white/60">No orders found.</div>
+          <div className="text-sm text-slate-600">No orders found.</div>
         )}
       </div>
     </div>

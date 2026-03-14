@@ -171,14 +171,14 @@ export default function ChatPanel() {
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
+    <div className="rounded-2xl border border-slate-200 bg-white/90 p-5">
       <h3 className="text-lg font-bold">Chat</h3>
-      <p className="mt-1 text-sm text-white/70">
+      <p className="mt-1 text-sm text-slate-600">
         Handle multiple chats in one place.
       </p>
 
       {err && (
-        <div className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <div className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-700">
           {err}
         </div>
       )}
@@ -186,21 +186,21 @@ export default function ChatPanel() {
       <div className="mt-5 grid gap-4 lg:grid-cols-12">
         {/* conversations */}
         <div className="lg:col-span-4">
-          <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
+          <div className="rounded-2xl border border-slate-200 bg-white/90 p-3">
             <div className="flex items-center justify-between px-2 py-2">
               <div className="text-sm font-semibold">Conversations</div>
               <button
                 onClick={loadConversations}
-                className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-semibold hover:bg-white/[0.09]"
+                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold hover:bg-slate-100"
               >
                 Refresh
               </button>
             </div>
 
             {loading ? (
-              <div className="px-2 py-3 text-sm text-white/70">Loading…</div>
+              <div className="px-2 py-3 text-sm text-slate-600">Loading…</div>
             ) : convos.length === 0 ? (
-              <div className="px-2 py-3 text-sm text-white/70">
+              <div className="px-2 py-3 text-sm text-slate-600">
                 No conversations yet.
               </div>
             ) : (
@@ -212,19 +212,19 @@ export default function ChatPanel() {
                     className={cx(
                       "w-full text-left rounded-2xl border px-3 py-3 transition",
                       c.id === activeId
-                        ? "border-yellow-500/30 bg-yellow-500/10"
-                        : "border-white/10 bg-white/[0.06] hover:bg-white/[0.09]",
+                        ? "border-amber-500/30 bg-amber-500/10"
+                        : "border-slate-200 bg-slate-50 hover:bg-slate-100",
                     )}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="text-sm font-semibold">
                         {c.customer_id || "Customer"}
                       </div>
-                      <span className="rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-xs text-white/70">
+                      <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">
                         {c.status || "open"}
                       </span>
                     </div>
-                    <div className="mt-1 text-xs text-white/55">
+                    <div className="mt-1 text-xs text-slate-500">
                       {new Date(c.created_at).toLocaleString()}
                     </div>
                   </button>
@@ -236,13 +236,13 @@ export default function ChatPanel() {
 
         {/* messages */}
         <div className="lg:col-span-8">
-          <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+          <div className="rounded-2xl border border-slate-200 bg-white/90 p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="text-sm font-semibold">
                   {active ? `Chat: ${active.customer_id}` : "Select a chat"}
                 </div>
-                <div className="mt-1 text-xs text-white/60">
+                <div className="mt-1 text-xs text-slate-500">
                   Status: {active?.status || "—"}
                 </div>
               </div>
@@ -263,10 +263,10 @@ export default function ChatPanel() {
               </div>
             </div>
 
-            <div className="mt-4 h-[380px] overflow-auto rounded-2xl border border-white/10 bg-[#070a0f] p-3">
+            <div className="mt-4 h-[380px] overflow-auto rounded-2xl border border-slate-200 bg-white p-3">
               {activeId ? (
                 messages.length === 0 ? (
-                  <div className="text-sm text-white/70">No messages yet.</div>
+                  <div className="text-sm text-slate-600">No messages yet.</div>
                 ) : (
                   <div className="grid gap-2">
                     {messages.map((m) => (
@@ -275,18 +275,18 @@ export default function ChatPanel() {
                         className={cx(
                           "max-w-[92%] rounded-2xl border px-3 py-2 text-sm",
                           m.sender === "admin"
-                            ? "ml-auto border-yellow-500/20 bg-yellow-500/10"
-                            : "mr-auto border-white/10 bg-white/[0.06]",
+                            ? "ml-auto border-amber-500/20 bg-amber-500/10"
+                            : "mr-auto border-slate-200 bg-slate-50",
                         )}
                       >
-                        <div className="text-xs text-white/55">
+                        <div className="text-xs text-slate-500">
                           {m.sender} •{" "}
                           {new Date(m.created_at).toLocaleTimeString()}
                         </div>
-                        <div className="mt-1 text-white/90">{m.content}</div>
+                        <div className="mt-1 text-slate-900">{m.content}</div>
                         {m.attachment_url ? (
                           <a
-                            className="mt-2 inline-block text-xs font-semibold text-yellow-100 underline"
+                            className="mt-2 inline-block text-xs font-semibold text-amber-600 underline"
                             href={m.attachment_url}
                             target="_blank"
                             rel="noreferrer"
@@ -300,7 +300,7 @@ export default function ChatPanel() {
                   </div>
                 )
               ) : (
-                <div className="text-sm text-white/70">
+                <div className="text-sm text-slate-600">
                   Select a conversation to view messages.
                 </div>
               )}
@@ -311,7 +311,7 @@ export default function ChatPanel() {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 placeholder="Type a reply…"
-                className="flex-1 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-yellow-500/30"
+                className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500/30"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -321,7 +321,7 @@ export default function ChatPanel() {
               />
 
               <div className="flex gap-2">
-                <label className="cursor-pointer rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-semibold hover:bg-white/[0.09]">
+                <label className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold hover:bg-slate-100">
                   Upload
                   <input
                     type="file"
@@ -349,7 +349,7 @@ export default function ChatPanel() {
               </div>
             </div>
 
-            <div className="mt-3 text-xs text-white/60">
+            <div className="mt-3 text-xs text-slate-500">
               Note: Customers will upload payment proof inside the customer
               chat. You will see it here as an attachment.
             </div>

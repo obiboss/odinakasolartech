@@ -22,8 +22,8 @@ export default function HomeHero({ store, wa }) {
             sizes="100vw"
           />
           {/* Premium overlays for legibility */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/55 to-black/25" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/35" />
+          <div className="absolute inset-0 bg-gradient-to-r from-white/80 via-white/55 to-white/25" />
+          <div className="absolute inset-0 bg-gradient-to-t from-white/55 via-transparent to-white/35" />
         </div>
       )}
 
@@ -39,7 +39,7 @@ export default function HomeHero({ store, wa }) {
             </FadeUp>
 
             <FadeUp delay={0.08} className="mt-4">
-              <p className="text-white/70 text-base sm:text-lg max-w-2xl">
+              <p className="text-slate-700 text-base sm:text-lg max-w-2xl">
                 Panels, inverters, batteries, controllers, cables, breakers,
                 lights & accessories — delivered with clarity and speed via
                 WhatsApp.
@@ -74,21 +74,27 @@ export default function HomeHero({ store, wa }) {
               delay={0.16}
               className="mt-7 grid grid-cols-1 sm:grid-cols-3 gap-3"
             >
-              <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 shadow-soft">
-                <div className="text-sm font-semibold">Verified Products</div>
-                <div className="text-sm text-white/60 mt-1">
+              <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-soft">
+                <div className="text-sm font-semibold text-slate-900">
+                  Verified Products
+                </div>
+                <div className="text-sm text-slate-600 mt-1">
                   Panels • Inverters • Batteries
                 </div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 shadow-soft">
-                <div className="text-sm font-semibold">Fast Ordering</div>
-                <div className="text-sm text-white/60 mt-1">
+              <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-soft">
+                <div className="text-sm font-semibold text-slate-900">
+                  Fast Ordering
+                </div>
+                <div className="text-sm text-slate-600 mt-1">
                   Price • Stock • Delivery
                 </div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 shadow-soft">
-                <div className="text-sm font-semibold">Homes & SMEs</div>
-                <div className="text-sm text-white/60 mt-1">
+              <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-soft">
+                <div className="text-sm font-semibold text-slate-900">
+                  Homes & SMEs
+                </div>
+                <div className="text-sm text-slate-600 mt-1">
                   Right sizing guidance
                 </div>
               </div>
@@ -96,28 +102,30 @@ export default function HomeHero({ store, wa }) {
           </div>
 
           <div className="lg:col-span-5">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5 shadow-soft">
-              <div className="text-sm font-semibold">Shop by category</div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft">
+              <div className="text-sm font-semibold text-slate-900">
+                Shop by category
+              </div>
               <div className="mt-4 grid grid-cols-2 gap-3">
                 {store.categories.map((c) => (
                   <a
                     key={c.id}
                     href={`/shop?cat=${c.id}`}
-                    className="rounded-2xl border border-white/10 bg-black/25 px-3 py-3 text-sm text-white/80 hover:text-white hover:bg-black/35 transition"
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition"
                   >
                     {c.name}
                   </a>
                 ))}
               </div>
 
-              <div className="mt-6 text-sm text-white/70">
-                <div className="font-semibold text-white">
+              <div className="mt-6 text-sm text-slate-600">
+                <div className="font-semibold text-slate-900">
                   {store.business.name}
                 </div>
-                <div className="text-white/60 mt-1">
+                <div className="text-slate-600 mt-1">
                   {store.business.location}
                 </div>
-                <div className="text-white/60">{store.business.hours}</div>
+                <div className="text-slate-600">{store.business.hours}</div>
               </div>
             </div>
           </div>

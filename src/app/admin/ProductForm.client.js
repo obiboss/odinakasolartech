@@ -28,6 +28,11 @@ function extractStoragePathFromPublicUrl(url) {
   return url.slice(idx + marker.length);
 }
 
+function generateImageUploadPath(productId, ext) {
+  const safeExt = ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "jpg";
+  return `${productId}/${Date.now()}-${Math.random().toString(16).slice(2)}.${safeExt}`;
+}
+
 export default function ProductForm({
   initialProduct,
   initialImages,
@@ -142,12 +147,7 @@ export default function ProductForm({
 
     for (const file of files) {
       const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-      const safeExt = ["jpg", "jpeg", "png", "webp"].includes(ext)
-        ? ext
-        : "jpg";
-      const path = `${initialProduct.id}/${Date.now()}-${Math.random().toString(16).slice(2)}.${safeExt}`;
-
-      const up = await supabase.storage
+      const path = generateImageUploadPath(initialProduct.id, ext);
         .from("product-images")
         .upload(path, file, {
           cacheControl: "31536000",
@@ -215,15 +215,14 @@ export default function ProductForm({
     <div className="grid gap-8 lg:grid-cols-12">
       <form
         onSubmit={saveProduct}
-        className="lg:col-span-7 rounded-2xl border border-black/10 bg-white/70 p-6 shadow-soft backdrop-blur
-                   dark:border-white/10 dark:bg-black/35"
+        className="lg:col-span-7 rounded-2xl border border-black/10 bg-white/70 p-6 shadow-soft backdrop-blur"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold tracking-tight">
               {isEdit ? "Edit Product" : "New Product"}
             </h1>
-            <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+            <p className="mt-1 text-sm text-black/60">
               Professional catalog entry with SEO-ready slug.
             </p>
           </div>
@@ -233,8 +232,7 @@ export default function ProductForm({
               type="button"
               onClick={deleteProduct}
               disabled={busy}
-              className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-500/15
-                         dark:text-red-200"
+              className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-500/15"
             >
               Delete
             </button>
@@ -246,7 +244,7 @@ export default function ProductForm({
             <label className="text-sm font-semibold">Name</label>
             <input
               className="mt-2 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm outline-none
-                         focus:ring-2 focus:ring-yellow-500/25 dark:border-white/10 dark:bg-black/30 dark:text-white"
+                         focus:ring-2 focus:ring-yellow-500/25"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Monocrystalline Solar Panel 550W"
@@ -258,13 +256,13 @@ export default function ProductForm({
             <label className="text-sm font-semibold">Slug</label>
             <input
               className="mt-2 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm outline-none
-                         focus:ring-2 focus:ring-yellow-500/25 dark:border-white/10 dark:bg-black/30 dark:text-white"
+                         focus:ring-2 focus:ring-yellow-500/25"
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
               placeholder="mono-panel-550w"
               required
             />
-            <div className="mt-2 text-xs text-black/55 dark:text-white/55">
+            <div className="mt-2 text-xs text-black/55">
               Used in URLs + SEO. Keep it short and keyword-relevant.
             </div>
           </div>
@@ -274,13 +272,13 @@ export default function ProductForm({
               <label className="text-sm font-semibold">Price (NGN)</label>
               <input
                 className="mt-2 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm outline-none
-                           focus:ring-2 focus:ring-yellow-500/25 dark:border-white/10 dark:bg-black/30 dark:text-white"
+                           focus:ring-2 focus:ring-yellow-500/25"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 type="number"
                 placeholder="0"
               />
-              <div className="mt-2 text-xs text-black/55 dark:text-white/55">
+              <div className="mt-2 text-xs text-black/55">
                 Leave empty if “Request price”.
               </div>
             </div>
@@ -291,7 +289,7 @@ export default function ProductForm({
               </label>
               <select
                 className="mt-2 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm outline-none
-                           focus:ring-2 focus:ring-yellow-500/25 dark:border-white/10 dark:bg-black/30 dark:text-white"
+                           focus:ring-2 focus:ring-yellow-500/25"
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
               >
@@ -309,7 +307,7 @@ export default function ProductForm({
             <label className="text-sm font-semibold">Description</label>
             <textarea
               className="mt-2 w-full min-h-[120px] rounded-xl border border-black/10 bg-white px-4 py-3 text-sm outline-none
-                         focus:ring-2 focus:ring-yellow-500/25 dark:border-white/10 dark:bg-black/30 dark:text-white"
+                         focus:ring-2 focus:ring-yellow-500/25"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="High-efficiency mono panel for residential and commercial systems..."
@@ -326,15 +324,14 @@ export default function ProductForm({
           </label>
 
           {error && (
-            <div className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-200">
+            <div className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-700">
               {error}
             </div>
           )}
 
           <button
             disabled={busy}
-            className="rounded-2xl bg-black px-4 py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60
-                       dark:bg-white dark:text-black"
+            className="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-60"
           >
             {busy ? "Saving..." : "Save Product"}
           </button>
@@ -342,22 +339,16 @@ export default function ProductForm({
       </form>
 
       <div className="lg:col-span-5 space-y-4">
-        <div
-          className="rounded-2xl border border-black/10 bg-white/70 p-6 shadow-soft backdrop-blur
-                        dark:border-white/10 dark:bg-black/35"
-        >
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft backdrop-blur">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-semibold">Images</div>
-              <div className="mt-1 text-xs text-black/55 dark:text-white/55">
+              <div className="mt-1 text-xs text-slate-600">
                 Upload after saving the product.
               </div>
             </div>
 
-            <label
-              className="cursor-pointer rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-semibold hover:bg-black/5
-                               dark:border-white/10 dark:bg-black/30 dark:hover:bg-white/10"
-            >
+            <label className="cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-100">
               {uploading ? "Uploading..." : "Upload"}
               <input
                 type="file"
@@ -372,7 +363,7 @@ export default function ProductForm({
 
           <div className="mt-5">
             {primaryImage ? (
-              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/5">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
                 <Image
                   src={primaryImage}
                   alt="Primary product image"
@@ -382,7 +373,7 @@ export default function ProductForm({
                 />
               </div>
             ) : (
-              <div className="rounded-2xl border border-black/10 bg-black/5 p-6 text-sm text-black/60 dark:border-white/10 dark:bg-white/5 dark:text-white/60">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
                 No images yet.
               </div>
             )}
@@ -392,7 +383,7 @@ export default function ProductForm({
             {(images || []).map((img) => (
               <div
                 key={img.id}
-                className="group relative aspect-square overflow-hidden rounded-xl border border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/5"
+                className="group relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-50"
               >
                 <Image
                   src={img.image_url}
@@ -404,7 +395,7 @@ export default function ProductForm({
                 <button
                   type="button"
                   onClick={() => removeImage(img)}
-                  className="absolute right-2 top-2 rounded-lg bg-black/70 px-2 py-1 text-[11px] font-semibold text-white opacity-0 transition group-hover:opacity-100"
+                  className="absolute right-2 top-2 rounded-lg bg-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-900 opacity-0 transition group-hover:opacity-100"
                 >
                   Remove
                 </button>
@@ -413,9 +404,9 @@ export default function ProductForm({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-yellow-500/25 bg-yellow-500/10 p-5 text-sm text-yellow-900 dark:text-yellow-100">
+        <div className="rounded-2xl border border-yellow-500/25 bg-yellow-500/10 p-5 text-sm text-yellow-900">
           <div className="font-semibold">Tip</div>
-          <div className="mt-1 text-black/70 dark:text-white/70">
+          <div className="mt-1 text-black/70">
             Use consistent product photos: 4:3 ratio, clean lighting, minimal
             background.
           </div>

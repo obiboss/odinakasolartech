@@ -1,3 +1,4 @@
+// src/app/admin/page.js
 import { createClient } from "@/lib/supabase/server";
 import AdminLoginInline from "@/components/admin/AdminLogininline";
 import AdminDashboardClient from "@/app/admin/AdminDashboard.client";
@@ -6,8 +7,6 @@ export const metadata = {
   title: "Admin — Odinaka Solar Tech",
   robots: { index: false, follow: false },
 };
-
-export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -29,5 +28,6 @@ export default async function AdminPage() {
     return <AdminLoginInline errorText="Not authorized for admin access." />;
   }
 
+  // Server verified => render SPA dashboard
   return <AdminDashboardClient />;
 }

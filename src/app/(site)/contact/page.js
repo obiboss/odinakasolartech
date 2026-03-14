@@ -19,9 +19,11 @@ export default function ContactPage() {
   return (
     <Container className="py-10">
       <h1 className="text-2xl font-bold">Contact</h1>
-      <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-5 max-w-xl">
-        <div className="text-white/80">{store.business.location}</div>
-        <div className="text-white/60 text-sm mt-1">{store.business.hours}</div>
+      <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 max-w-xl">
+        <div className="text-slate-800">{store.business.location}</div>
+        <div className="text-slate-600 text-sm mt-1">
+          {store.business.hours}
+        </div>
         <div className="mt-4 flex gap-2">
           <Button
             as="a"

@@ -34,19 +34,19 @@ export default function AdminLoginInline({ errorText = "" }) {
 
   return (
     <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black/40 p-6 backdrop-blur-xl shadow-soft">
-        <h1 className="text-xl font-bold text-white">Admin Login</h1>
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white/90 p-6 backdrop-blur-xl shadow-soft">
+        <h1 className="text-xl font-bold text-slate-900">Admin Login</h1>
 
         <form onSubmit={onSubmit} className="mt-6 space-y-3">
           <input
-            className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
           />
           <input
-            className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none"
             placeholder="Password"
             type="password"
             value={password}
@@ -55,7 +55,7 @@ export default function AdminLoginInline({ errorText = "" }) {
           />
 
           {error ? (
-            <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-700">
               {error}
             </div>
           ) : null}
