@@ -77,7 +77,8 @@ function buildBaseMetadataImpl() {
   const seo = getSeo();
   const store = getStore();
 
-  const base = store?.business?.domain || "https://YOURDOMAIN.com";
+  const base =
+    store?.business?.domain || "https://www.odinakachukwusolartech.com";
   const title = seo?.defaultTitle || store?.business?.name || "Solar Store";
   const description =
     seo?.defaultDescription || store?.business?.tagline || "Solar products";
@@ -110,7 +111,8 @@ function productMetadataImpl(product) {
   const seo = getSeo();
   const store = getStore();
 
-  const base = store?.business?.domain || "https://YOURDOMAIN.com";
+  const base =
+    store?.business?.domain || "https://www.odinakachukwusolartech.com";
   const title = `${product.name} — ${store.business.name}`;
   const description = product.short || seo.defaultDescription;
   const images = product.images?.length ? product.images : [seo.socialImage];

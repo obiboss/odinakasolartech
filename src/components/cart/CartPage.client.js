@@ -56,7 +56,10 @@ export default function CartPage({ store }) {
       );
     }
 
-    lines.push("", "Please send this order summary via WhatsApp or in-app chat.");
+    lines.push(
+      "",
+      "Please send this order summary via WhatsApp or in-app chat.",
+    );
 
     return lines.join("\n");
   }, [items, total, depositRequired, remainingBalance, hasHighValue]);
@@ -130,7 +133,9 @@ export default function CartPage({ store }) {
                   <div className="h-14 w-14 rounded-xl bg-slate-100" />
                 )}
                 <div>
-                  <div className="font-semibold text-slate-900">{item.name}</div>
+                  <div className="font-semibold text-slate-900">
+                    {item.name}
+                  </div>
                   <div className="text-sm text-slate-600">
                     {formatCurrency(item.price)} each
                   </div>

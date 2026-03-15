@@ -6,7 +6,8 @@ import { getStore } from "@/lib/content.server";
 
 export const metadata = {
   title: "Cart — Odinaka Solar Tech",
-  description: "Review your cart, view order totals, and get a shareable order summary.",
+  description:
+    "Review your cart, view order totals, and get a shareable order summary.",
 };
 
 export default function CartRoute() {

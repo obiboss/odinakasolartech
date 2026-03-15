@@ -43,9 +43,7 @@ export function CartProvider({ children }) {
       const existing = prev.find((x) => x.id === item.id);
       if (existing) {
         return prev.map((x) =>
-          x.id === item.id
-            ? { ...x, quantity: x.quantity + quantity }
-            : x,
+          x.id === item.id ? { ...x, quantity: x.quantity + quantity } : x,
         );
       }
       return [...prev, { ...item, quantity }];
@@ -67,7 +65,11 @@ export function CartProvider({ children }) {
   const clearCart = () => setItems([]);
 
   const subtotal = useMemo(
-    () => items.reduce((sum, item) => sum + Number(item.price || 0) * item.quantity, 0),
+    () =>
+      items.reduce(
+        (sum, item) => sum + Number(item.price || 0) * item.quantity,
+        0,
+      ),
     [items],
   );
 
