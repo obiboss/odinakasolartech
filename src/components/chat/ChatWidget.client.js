@@ -95,9 +95,84 @@ export default function ChatWidget() {
   const [signedMap, setSignedMap] = useState({}); // key: bucket/path -> signedUrl
   const bottomRef = useRef(null);
 
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const draggingRef = useRef(false);
+  const pointerStartRef = useRef({ x: 0, y: 0 });
+  const startPosRef = useRef({ x: 0, y: 0 });
+  const buttonRef = useRef(null);
+
   const canSend = useMemo(() => {
     return !busy && (text.trim().length > 0 || !!file) && !!conversationId;
   }, [busy, text, file, conversationId]);
+
+  useEffect(() => {
+    function setInitialPosition() {
+      const size = 56;
+      const margin = 24;
+      const x = Math.max(margin, window.innerWidth - size - margin);
+      const y = Math.max(margin, window.innerHeight - size - margin);
+      setPosition({ x, y });
+    }
+
+    setInitialPosition();
+    window.addEventListener("resize", setInitialPosition);
+    return () => window.removeEventListener("resize", setInitialPosition);
+  }, []);
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function handlePointerDown(e) {
+    if (!buttonRef.current) return;
+    draggingRef.current = false;
+    pointerStartRef.current = { x: e.clientX, y: e.clientY };
+    startPosRef.current = { ...position };
+    buttonRef.current.setPointerCapture(e.pointerId);
+  }
+
+  function handlePointerMove(e) {
+    if (!buttonRef.current) return;
+    if (e.pressure === 0) return;
+
+    const dx = e.clientX - pointerStartRef.current.x;
+    const dy = e.clientY - pointerStartRef.current.y;
+    const distance = Math.hypot(dx, dy);
+
+    const dragThreshold = 5;
+    const isDraggingNow = distance > dragThreshold;
+
+    if (isDraggingNow) {
+      const nextX = startPosRef.current.x + dx;
+      const nextY = startPosRef.current.y + dy;
+
+      const size = 56;
+      const margin = 24;
+      const maxX = window.innerWidth - size - margin;
+      const maxY = window.innerHeight - size - margin;
+
+      setPosition({
+        x: clamp(nextX, margin, maxX),
+        y: clamp(nextY, margin, maxY),
+      });
+    }
+
+    draggingRef.current = isDraggingNow;
+    setIsDragging(isDraggingNow);
+  }
+
+  function handlePointerUp(e) {
+    if (!buttonRef.current) return;
+    buttonRef.current.releasePointerCapture(e.pointerId);
+    draggingRef.current = false;
+    setIsDragging(false);
+  }
+
+  function handleButtonClick() {
+    if (draggingRef.current) return;
+    setOpen((v) => !v);
+  }
 
   useEffect(() => {
     let alive = true;
@@ -231,15 +306,26 @@ export default function ChatWidget() {
     <>
       {/* launcher */}
       <button
-        onClick={() => setOpen((v) => !v)}
+        ref={buttonRef}
+        type="button"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onClick={handleButtonClick}
+        aria-label="Open chat support"
+        style={{
+          left: position.x,
+          top: position.y,
+        }}
         className={cx(
-          "fixed bottom-5 right-5 z-[80] rounded-full",
-          "bg-yellow-500 text-black shadow-[0_18px_60px_rgba(0,0,0,0.45)]",
-          "h-14 w-14",
+          "fixed z-[80] rounded-full bg-[#F5A200] shadow-[0_14px_40px_rgba(0,0,0,0.28)]",
+          "h-14 w-14 flex items-center justify-center transition-transform duration-200",
+          "hover:scale-105",
+          "cursor-pointer",
+          isDragging ? "cursor-grabbing" : "cursor-grab",
         )}
-        aria-label="Chat"
       >
-        <MessageCircle className="h-6 w-6" />
+        <MessageCircle className="h-6 w-6 text-white" />
       </button>
 
       {/* panel */}
