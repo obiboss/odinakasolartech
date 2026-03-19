@@ -765,19 +765,16 @@ export default function ChatWidget() {
       const updates = {};
       for (const key of needed) {
         try {
-          const [bucket, ...rest] = key.split("/");
-          const path = rest.join("/");
-          if (!bucket || !path) continue;
-          const url = await getSignedUrl(m.attachment_url);
-          // const url = await getSignedUrl(key);
+          const url = await getSignedUrl(key);
           updates[key] = url;
         } catch {
           // ignore bad/missing attachment
         }
       }
 
-      if (cancelled || Object.keys(updates).length === 0) return;
-      setSignedMap((prev) => ({ ...prev, ...updates }));
+      if (!cancelled && Object.keys(updates).length > 0) {
+        setSignedMap((prev) => ({ ...prev, ...updates }));
+      }
     })();
 
     return () => {
