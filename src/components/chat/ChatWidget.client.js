@@ -475,54 +475,32 @@ function clamp(value, min, max) {
 }
 
 async function ensureSession() {
-  const {
-    data: { session },
-    error,
-  } = await supabase.auth.getSession();
-
+  const { data, error } = await supabase.auth.getSession();
   if (error) throw error;
-  if (session) return session;
+  if (data?.session) return data.session;
 
-  const { data, error: anonError } = await supabase.auth.signInAnonymously();
+  const { data: anon, error: anonError } =
+    await supabase.auth.signInAnonymously();
   if (anonError) throw anonError;
-  if (!data?.session)
-    throw new Error("Anonymous session could not be created.");
-
-  return data.session;
+  return anon.session;
 }
 
-async function getCurrentUser() {
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error) throw error;
-  if (!user?.id) throw new Error("No anonymous user found.");
-
-  return user;
-}
-
-async function getOrCreateConversation() {
-  await ensureSession();
-  const user = await getCurrentUser();
-
+async function getOrCreateConversation(userId) {
   const { data: existing, error: selErr } = await supabase
     .from("conversations")
-    .select("id")
-    .eq("customer_id", user.id)
+    .select("id,status,created_at")
+    .eq("customer_id", userId)
     .eq("status", "open")
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
 
   if (selErr) throw selErr;
-  if (existing?.id) return existing.id;
+  if (existing?.[0]?.id) return existing[0].id;
 
   const { data: created, error: insErr } = await supabase
     .from("conversations")
     .insert({
-      customer_id: user.id,
+      customer_id: userId,
       status: "open",
       order_id: null,
     })
@@ -530,15 +508,15 @@ async function getOrCreateConversation() {
     .single();
 
   if (insErr) throw insErr;
-  if (!created?.id) throw new Error("Conversation could not be created.");
-
   return created.id;
 }
 
 async function fetchMessages(conversationId) {
   const { data, error } = await supabase
     .from("messages")
-    .select("id, sender, content, attachment_url, attachment_type, created_at")
+    .select(
+      "id, conversation_id, sender, content, attachment_url, attachment_type, created_at",
+    )
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: true });
 
@@ -592,34 +570,10 @@ export default function ChatWidget() {
   const pointerStartRef = useRef({ x: 0, y: 0 });
   const startPosRef = useRef({ x: 0, y: 0 });
   const buttonRef = useRef(null);
-  const bootingRef = useRef(null);
 
   const canSend = useMemo(() => {
     return !busy && (text.trim().length > 0 || !!file) && !!conversationId;
   }, [busy, text, file, conversationId]);
-
-  async function bootChat() {
-    if (bootingRef.current) return bootingRef.current;
-
-    bootingRef.current = (async () => {
-      setBootError("");
-
-      await ensureSession();
-      const cid = await getOrCreateConversation();
-      setConversationId(cid);
-
-      const initial = await fetchMessages(cid);
-      setMessages(initial);
-
-      return cid;
-    })();
-
-    try {
-      return await bootingRef.current;
-    } finally {
-      bootingRef.current = null;
-    }
-  }
 
   useEffect(() => {
     function setInitialPosition() {
@@ -681,22 +635,9 @@ export default function ChatWidget() {
     setIsDragging(false);
   }
 
-  async function handleButtonClick() {
+  function handleButtonClick() {
     if (draggingRef.current) return;
-
-    const nextOpen = !open;
-    setOpen(nextOpen);
-
-    if (nextOpen && !conversationId && !busy) {
-      try {
-        setBusy(true);
-        await bootChat();
-      } catch (e) {
-        setBootError(e?.message || "Chat failed to start.");
-      } finally {
-        setBusy(false);
-      }
-    }
+    setOpen((v) => !v);
   }
 
   useEffect(() => {
@@ -705,7 +646,18 @@ export default function ChatWidget() {
     (async () => {
       try {
         setBusy(true);
-        await bootChat();
+        const session = await ensureSession();
+        if (!alive) return;
+
+        const cid = await getOrCreateConversation(session.user.id);
+        if (!alive) return;
+
+        setConversationId(cid);
+
+        const initial = await fetchMessages(cid);
+        if (!alive) return;
+
+        setMessages(initial);
       } catch (e) {
         if (!alive) return;
         setBootError(e?.message || "Chat failed to start.");
@@ -733,10 +685,13 @@ export default function ChatWidget() {
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
+          const incoming = payload.new;
+          if (!incoming?.id) return;
+
           setMessages((prev) => {
-            const exists = prev.some((m) => m.id === payload.new.id);
+            const exists = prev.some((m) => m.id === incoming.id);
             if (exists) return prev;
-            return [...prev, payload.new];
+            return [...prev, incoming];
           });
         },
       )
@@ -752,33 +707,32 @@ export default function ChatWidget() {
   }, [messages, open]);
 
   useEffect(() => {
-    let cancelled = false;
+    let alive = true;
 
     (async () => {
-      const needed = messages
+      const need = messages
+        .filter((m) => m.attachment_url)
         .map((m) => m.attachment_url)
-        .filter(Boolean)
-        .filter((key) => !signedMap[key]);
+        .filter((u) => !signedMap[u]);
 
-      if (needed.length === 0) return;
+      if (need.length === 0) return;
 
-      const updates = {};
-      for (const key of needed) {
+      const next = { ...signedMap };
+      for (const key of need) {
         try {
           const url = await getSignedUrl(key);
-          updates[key] = url;
+          next[key] = url;
         } catch {
-          // ignore bad/missing attachment
+          // ignore
         }
       }
 
-      if (!cancelled && Object.keys(updates).length > 0) {
-        setSignedMap((prev) => ({ ...prev, ...updates }));
-      }
+      if (!alive) return;
+      setSignedMap(next);
     })();
 
     return () => {
-      cancelled = true;
+      alive = false;
     };
   }, [messages, signedMap]);
 
@@ -788,8 +742,6 @@ export default function ChatWidget() {
 
     setBusy(true);
     try {
-      await ensureSession();
-
       let attachment_url = null;
       let attachment_type = null;
 
@@ -801,15 +753,27 @@ export default function ChatWidget() {
 
       const content = text.trim();
 
-      const { error } = await supabase.from("messages").insert({
-        conversation_id: conversationId,
-        sender: "customer",
-        content: content || "",
-        attachment_url,
-        attachment_type,
-      });
+      const { data: newMessage, error } = await supabase
+        .from("messages")
+        .insert({
+          conversation_id: conversationId,
+          sender: "customer",
+          content: content || "",
+          attachment_url,
+          attachment_type,
+        })
+        .select(
+          "id, conversation_id, sender, content, attachment_url, attachment_type, created_at",
+        )
+        .single();
 
       if (error) throw error;
+
+      setMessages((prev) => {
+        const exists = prev.some((m) => m.id === newMessage.id);
+        if (exists) return prev;
+        return [...prev, newMessage];
+      });
 
       setText("");
       setFile(null);
@@ -835,9 +799,8 @@ export default function ChatWidget() {
           top: position.y,
         }}
         className={cx(
-          "fixed z-[80] flex h-14 w-14 items-center justify-center rounded-full",
-          "bg-[#F5A200] shadow-[0_14px_40px_rgba(0,0,0,0.28)]",
-          "cursor-pointer transition-transform duration-200 hover:scale-105",
+          "fixed z-[80] h-14 w-14 rounded-full bg-[#F5A200] shadow-[0_14px_40px_rgba(0,0,0,0.28)]",
+          "flex items-center justify-center transition-transform duration-200 hover:scale-105",
           isDragging ? "cursor-grabbing" : "cursor-grab",
         )}
       >
@@ -877,12 +840,13 @@ export default function ChatWidget() {
             <div className="mt-2 space-y-2">
               {messages.map((m) => {
                 const isMe = m.sender === "customer";
-                const key = m.attachment_url || "";
-                const signed = key ? signedMap[key] : "";
+                const signed = m.attachment_url
+                  ? signedMap[m.attachment_url]
+                  : "";
 
                 return (
                   <div
-                    key={m.id || `${m.created_at}-${Math.random()}`}
+                    key={m.id}
                     className={cx(
                       "flex",
                       isMe ? "justify-end" : "justify-start",
@@ -950,7 +914,7 @@ export default function ChatWidget() {
 
               <button
                 type="submit"
-                disabled={!canSend}
+                disabled={busy}
                 className="rounded-xl bg-yellow-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
               >
                 {busy ? "..." : "Send"}

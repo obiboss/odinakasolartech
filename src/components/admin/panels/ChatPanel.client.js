@@ -1,4 +1,3 @@
-// src/components/admin/panels/ChatPanel.client.js
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -6,6 +5,32 @@ import { supabase } from "@/lib/supabase/client";
 
 function cx(...a) {
   return a.filter(Boolean).join(" ");
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString();
+}
+
+function formatTime(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString();
+}
+
+async function getSignedUrl(fullPath) {
+  const [bucket, ...rest] = fullPath.split("/");
+  const path = rest.join("/");
+
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(path, 60 * 30);
+
+  if (error) throw error;
+  return data.signedUrl;
 }
 
 export default function ChatPanel() {
@@ -18,6 +43,7 @@ export default function ChatPanel() {
   const [messages, setMessages] = useState([]);
   const [sending, setSending] = useState(false);
   const [text, setText] = useState("");
+  const [signedMap, setSignedMap] = useState({});
 
   const bottomRef = useRef(null);
 
@@ -41,7 +67,9 @@ export default function ChatPanel() {
   async function loadMessages(conversationId) {
     const { data, error } = await supabase
       .from("messages")
-      .select("id,conversation_id,sender,content,attachment_url,created_at")
+      .select(
+        "id,conversation_id,sender,content,attachment_url,attachment_type,created_at",
+      )
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true });
 
@@ -61,7 +89,7 @@ export default function ChatPanel() {
       await loadConversations();
       setLoading(false);
     })();
-    // realtime: conversations inserts/updates
+
     const ch = supabase
       .channel("admin-conversations")
       .on(
@@ -82,7 +110,6 @@ export default function ChatPanel() {
 
     loadMessages(activeId);
 
-    // realtime: messages for active convo
     const ch = supabase
       .channel(`admin-messages-${activeId}`)
       .on(
@@ -94,7 +121,15 @@ export default function ChatPanel() {
           filter: `conversation_id=eq.${activeId}`,
         },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new]);
+          const incoming = payload.new;
+          if (!incoming?.id) return;
+
+          setMessages((prev) => {
+            const exists = prev.some((m) => m.id === incoming.id);
+            if (exists) return prev;
+            return [...prev, incoming];
+          });
+
           setTimeout(
             () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
             50,
@@ -108,6 +143,36 @@ export default function ChatPanel() {
     };
   }, [activeId]);
 
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      const need = messages
+        .filter((m) => m.attachment_url)
+        .map((m) => m.attachment_url)
+        .filter((key) => !signedMap[key]);
+
+      if (need.length === 0) return;
+
+      const next = { ...signedMap };
+      for (const key of need) {
+        try {
+          const url = await getSignedUrl(key);
+          next[key] = url;
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!alive) return;
+      setSignedMap(next);
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [messages, signedMap]);
+
   async function send() {
     if (!activeId) return;
     const content = text.trim();
@@ -116,15 +181,32 @@ export default function ChatPanel() {
     setSending(true);
     setErr("");
 
-    const { error } = await supabase.from("messages").insert({
-      conversation_id: activeId,
-      sender: "admin",
-      content,
-    });
+    const { data: newMessage, error } = await supabase
+      .from("messages")
+      .insert({
+        conversation_id: activeId,
+        sender: "admin",
+        content,
+      })
+      .select(
+        "id,conversation_id,sender,content,attachment_url,attachment_type,created_at",
+      )
+      .single();
 
     setSending(false);
     if (error) return setErr(error.message);
+
+    setMessages((prev) => {
+      const exists = prev.some((m) => m.id === newMessage.id);
+      if (exists) return prev;
+      return [...prev, newMessage];
+    });
+
     setText("");
+    setTimeout(
+      () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
+      50,
+    );
   }
 
   async function uploadChatFile(file) {
@@ -139,6 +221,7 @@ export default function ChatPanel() {
     const up = await supabase.storage.from("chat-uploads").upload(path, file, {
       cacheControl: "3600",
       upsert: false,
+      contentType: file.type || "application/octet-stream",
     });
 
     if (up.error) {
@@ -146,18 +229,35 @@ export default function ChatPanel() {
       return setErr(up.error.message);
     }
 
-    const { data } = supabase.storage.from("chat-uploads").getPublicUrl(path);
-    const url = data?.publicUrl;
+    const attachment_url = `chat-uploads/${path}`;
 
-    const { error } = await supabase.from("messages").insert({
-      conversation_id: activeId,
-      sender: "admin",
-      content: "File uploaded",
-      attachment_url: url,
-    });
+    const { data: newMessage, error } = await supabase
+      .from("messages")
+      .insert({
+        conversation_id: activeId,
+        sender: "admin",
+        content: "File uploaded",
+        attachment_url,
+        attachment_type: file.type || "application/octet-stream",
+      })
+      .select(
+        "id,conversation_id,sender,content,attachment_url,attachment_type,created_at",
+      )
+      .single();
 
     setSending(false);
     if (error) return setErr(error.message);
+
+    setMessages((prev) => {
+      const exists = prev.some((m) => m.id === newMessage.id);
+      if (exists) return prev;
+      return [...prev, newMessage];
+    });
+
+    setTimeout(
+      () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
+      50,
+    );
   }
 
   async function setStatus(status) {
@@ -166,6 +266,7 @@ export default function ChatPanel() {
       .from("conversations")
       .update({ status })
       .eq("id", activeId);
+
     if (error) return setErr(error.message);
     await loadConversations();
   }
@@ -184,7 +285,6 @@ export default function ChatPanel() {
       )}
 
       <div className="mt-5 grid gap-4 lg:grid-cols-12">
-        {/* conversations */}
         <div className="lg:col-span-4">
           <div className="rounded-2xl border border-slate-200 bg-white/90 p-3">
             <div className="flex items-center justify-between px-2 py-2">
@@ -210,7 +310,7 @@ export default function ChatPanel() {
                     key={c.id}
                     onClick={() => setActiveId(c.id)}
                     className={cx(
-                      "w-full text-left rounded-2xl border px-3 py-3 transition",
+                      "w-full rounded-2xl border px-3 py-3 text-left transition",
                       c.id === activeId
                         ? "border-amber-500/30 bg-amber-500/10"
                         : "border-slate-200 bg-slate-50 hover:bg-slate-100",
@@ -225,7 +325,7 @@ export default function ChatPanel() {
                       </span>
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
-                      {new Date(c.created_at).toLocaleString()}
+                      {formatDateTime(c.created_at)}
                     </div>
                   </button>
                 ))}
@@ -234,7 +334,6 @@ export default function ChatPanel() {
           </div>
         </div>
 
-        {/* messages */}
         <div className="lg:col-span-8">
           <div className="rounded-2xl border border-slate-200 bg-white/90 p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -250,13 +349,13 @@ export default function ChatPanel() {
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setStatus("open")}
-                  className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-semibold hover:bg-white/[0.09]"
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold hover:bg-slate-100"
                 >
                   Mark open
                 </button>
                 <button
                   onClick={() => setStatus("closed")}
-                  className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-semibold hover:bg-white/[0.09]"
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold hover:bg-slate-100"
                 >
                   Mark closed
                 </button>
@@ -269,33 +368,45 @@ export default function ChatPanel() {
                   <div className="text-sm text-slate-600">No messages yet.</div>
                 ) : (
                   <div className="grid gap-2">
-                    {messages.map((m) => (
-                      <div
-                        key={m.id}
-                        className={cx(
-                          "max-w-[92%] rounded-2xl border px-3 py-2 text-sm",
-                          m.sender === "admin"
-                            ? "ml-auto border-amber-500/20 bg-amber-500/10"
-                            : "mr-auto border-slate-200 bg-slate-50",
-                        )}
-                      >
-                        <div className="text-xs text-slate-500">
-                          {m.sender} •{" "}
-                          {new Date(m.created_at).toLocaleTimeString()}
+                    {messages.map((m) => {
+                      const signed = m.attachment_url
+                        ? signedMap[m.attachment_url]
+                        : "";
+
+                      return (
+                        <div
+                          key={m.id}
+                          className={cx(
+                            "max-w-[92%] rounded-2xl border px-3 py-2 text-sm",
+                            m.sender === "admin"
+                              ? "ml-auto border-amber-500/20 bg-amber-500/10"
+                              : "mr-auto border-slate-200 bg-slate-50",
+                          )}
+                        >
+                          <div className="text-xs text-slate-500">
+                            {m.sender} • {formatTime(m.created_at)}
+                          </div>
+                          <div className="mt-1 text-slate-900">{m.content}</div>
+
+                          {m.attachment_url ? (
+                            signed ? (
+                              <a
+                                className="mt-2 inline-block text-xs font-semibold text-amber-600 underline"
+                                href={signed}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Open attachment
+                              </a>
+                            ) : (
+                              <div className="mt-2 text-xs text-slate-500">
+                                Loading attachment…
+                              </div>
+                            )
+                          ) : null}
                         </div>
-                        <div className="mt-1 text-slate-900">{m.content}</div>
-                        {m.attachment_url ? (
-                          <a
-                            className="mt-2 inline-block text-xs font-semibold text-amber-600 underline"
-                            href={m.attachment_url}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Open attachment
-                          </a>
-                        ) : null}
-                      </div>
-                    ))}
+                      );
+                    })}
                     <div ref={bottomRef} />
                   </div>
                 )
@@ -340,8 +451,7 @@ export default function ChatPanel() {
                   onClick={send}
                   disabled={!activeId || sending}
                   className={cx(
-                    "rounded-2xl px-4 py-3 text-sm font-semibold transition",
-                    "bg-white text-black hover:opacity-95 disabled:opacity-60",
+                    "rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black transition hover:opacity-95 disabled:opacity-60",
                   )}
                 >
                   Send
