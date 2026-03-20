@@ -224,7 +224,7 @@ export default function ProductsPanel() {
       ) : (
         <button
           onClick={backToList}
-          className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-semibold hover:bg-white/[0.09]"
+          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold hover:bg-slate-100"
         >
           Back
         </button>
@@ -234,7 +234,7 @@ export default function ProductsPanel() {
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
+      <div className="rounded-2xl border border-slate-200 bg-white/90 p-5">
         {header}
         <div className="mt-5 text-sm text-slate-600">Loading…</div>
       </div>
@@ -242,11 +242,11 @@ export default function ProductsPanel() {
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
+    <div className="rounded-2xl border border-slate-200 bg-white/90 p-5">
       {header}
 
       {err && (
-        <div className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <div className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-700">
           {err}
         </div>
       )}
@@ -281,7 +281,7 @@ export default function ProductsPanel() {
                         <div className="flex items-center gap-2">
                           <div className="font-semibold">{p.name}</div>
                           {p.featured && (
-                            <span className="rounded-full border border-yellow-500/30 bg-yellow-500/15 px-2 py-0.5 text-xs font-semibold text-yellow-100">
+                            <span className="rounded-full border border-yellow-500/30 bg-yellow-500/15 px-2 py-0.5 text-xs font-semibold text-yellow-800">
                               Featured
                             </span>
                           )}
@@ -301,13 +301,13 @@ export default function ProductsPanel() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => startEdit(p)}
-                        className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm font-semibold hover:bg-white/[0.09]"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold hover:bg-slate-100"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => deleteProduct(p.id)}
-                        className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-200 hover:bg-red-500/15"
+                        className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-500/15"
                       >
                         Delete
                       </button>

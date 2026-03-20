@@ -254,7 +254,7 @@ export default function OverviewPanel({ onGo }) {
                 key={k}
                 onClick={() => setRange(k)}
                 className={cx(
-                  "rounded-2xl px-4 py-2 text-sm font-semibold border border-white/10",
+                  "rounded-2xl px-4 py-2 text-sm font-semibold border border-slate-200",
                   range === k
                     ? "bg-yellow-500 text-black"
                     : "bg-slate-50 text-slate-700 hover:bg-slate-100",
@@ -271,7 +271,7 @@ export default function OverviewPanel({ onGo }) {
         </div>
 
         {err ? (
-          <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-700">
             {err}
           </div>
         ) : null}

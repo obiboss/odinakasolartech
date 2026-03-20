@@ -15,6 +15,7 @@ export default async function AdminPage() {
     data: { user },
     error,
   } = await supabase.auth.getUser();
+  console.log(user?.id);
 
   if (error || !user) return <AdminLoginInline />;
 

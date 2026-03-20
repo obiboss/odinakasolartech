@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import { getStore, getPromos } from "@/lib/content.server";
 import { whatsappLink } from "@/lib/whatsapp";
 import HeaderSearch from "@/components/search/HeaderSearch.client";
+import Image from "next/image";
 
 function getActivePromoText() {
   const promos = getPromos();
@@ -64,7 +65,17 @@ export default function Header() {
           <div className="hidden md:flex h-full items-center gap-4">
             {/* Left: brand */}
             <Link href="/" className="flex items-center gap-3 shrink-0">
-              <span className="h-9 w-9 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-200 border border-slate-200 shadow-soft" />
+              <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm px-2 py-1">
+                <Image
+                  src="/images/logo-mark.png"
+                  alt={store.business.name}
+                  width={84}
+                  height={84}
+                  priority
+                  className="h-12 w-auto object-contain"
+                />
+              </div>
+
               <div className="leading-tight">
                 <div className="text-sm font-bold tracking-tight text-slate-900">
                   {store.business.name}
@@ -74,12 +85,10 @@ export default function Header() {
                 </div>
               </div>
             </Link>
-
             {/* Middle: search */}
             <div className="flex-1 min-w-[260px]">
               <HeaderSearch />
             </div>
-
             {/* Nav */}
             <nav className="hidden lg:flex items-center gap-7 text-sm text-slate-700 shrink-0">
               <Link href="/shop" className="hover:text-slate-900 transition">
@@ -104,7 +113,6 @@ export default function Header() {
                 Support
               </Link>
             </nav>
-
             {/* Right actions */}
             <div className="flex items-center gap-2 shrink-0">
               {/* <Button
@@ -132,10 +140,18 @@ export default function Header() {
 
           {/* Mobile/tablet row */}
           <div className="md:hidden h-full flex items-center justify-between gap-3">
-            <Link href="/" className="flex items-center gap-3 min-w-0">
-              <span className="h-9 w-9 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-200 border border-slate-200 shadow-soft shrink-0" />
-              <div className="min-w-0 leading-tight">
-                <div className="text-sm font-bold tracking-tight text-slate-900 line-clamp-1">
+            <Link href="/" className="flex items-center gap-3 shrink-0">
+              <Image
+                src="/images/logo-mark.png" // <-- use the new sun + eagle image
+                alt={store.business.name}
+                width={44}
+                height={44}
+                priority
+                className="rounded-xl border border-slate-200 bg-white shadow-soft object-contain"
+              />
+
+              <div className="leading-tight">
+                <div className="text-sm font-bold tracking-tight text-slate-900">
                   {store.business.name}
                 </div>
                 <div className="text-[11px] text-slate-600 line-clamp-1">
@@ -143,7 +159,6 @@ export default function Header() {
                 </div>
               </div>
             </Link>
-
             <div className="flex items-center gap-2 shrink-0">
               <Button as={Link} href="/shop" variant="ghost" className="px-3">
                 Shop

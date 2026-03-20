@@ -215,14 +215,14 @@ export default function ProductForm({
     <div className="grid gap-8 lg:grid-cols-12">
       <form
         onSubmit={saveProduct}
-        className="lg:col-span-7 rounded-2xl border border-black/10 bg-white/70 p-6 shadow-soft backdrop-blur"
+        className="lg:col-span-7 rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-soft backdrop-blur"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold tracking-tight">
               {isEdit ? "Edit Product" : "New Product"}
             </h1>
-            <p className="mt-1 text-sm text-black/60">
+            <p className="mt-1 text-sm text-slate-600">
               Professional catalog entry with SEO-ready slug.
             </p>
           </div>
@@ -243,8 +243,8 @@ export default function ProductForm({
           <div>
             <label className="text-sm font-semibold">Name</label>
             <input
-              className="mt-2 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm outline-none
-                         focus:ring-2 focus:ring-yellow-500/25"
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none
+                         focus:ring-2 focus:ring-amber-500/30"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Monocrystalline Solar Panel 550W"
@@ -255,14 +255,14 @@ export default function ProductForm({
           <div>
             <label className="text-sm font-semibold">Slug</label>
             <input
-              className="mt-2 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm outline-none
-                         focus:ring-2 focus:ring-yellow-500/25"
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none
+                         focus:ring-2 focus:ring-amber-500/30"
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
               placeholder="mono-panel-550w"
               required
             />
-            <div className="mt-2 text-xs text-black/55">
+            <div className="mt-2 text-xs text-slate-500">
               Used in URLs + SEO. Keep it short and keyword-relevant.
             </div>
           </div>
@@ -271,14 +271,14 @@ export default function ProductForm({
             <div>
               <label className="text-sm font-semibold">Price (NGN)</label>
               <input
-                className="mt-2 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm outline-none
-                           focus:ring-2 focus:ring-yellow-500/25"
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none
+                           focus:ring-2 focus:ring-amber-500/30"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 type="number"
                 placeholder="0"
               />
-              <div className="mt-2 text-xs text-black/55">
+              <div className="mt-2 text-xs text-slate-500">
                 Leave empty if “Request price”.
               </div>
             </div>
@@ -288,8 +288,8 @@ export default function ProductForm({
                 Category (categoriez)
               </label>
               <select
-                className="mt-2 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm outline-none
-                           focus:ring-2 focus:ring-yellow-500/25"
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none
+                           focus:ring-2 focus:ring-amber-500/30"
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
               >
@@ -306,8 +306,8 @@ export default function ProductForm({
           <div>
             <label className="text-sm font-semibold">Description</label>
             <textarea
-              className="mt-2 w-full min-h-[120px] rounded-xl border border-black/10 bg-white px-4 py-3 text-sm outline-none
-                         focus:ring-2 focus:ring-yellow-500/25"
+              className="mt-2 w-full min-h-[120px] rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none
+                         focus:ring-2 focus:ring-amber-500/30"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="High-efficiency mono panel for residential and commercial systems..."

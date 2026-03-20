@@ -462,7 +462,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
@@ -474,6 +474,29 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
+function upsertMessages(prev, incoming) {
+  if (!incoming?.id) return prev;
+  const idx = prev.findIndex((m) => m.id === incoming.id);
+
+  if (idx >= 0) {
+    const next = [...prev];
+    next[idx] = { ...next[idx], ...incoming };
+    return next;
+  }
+
+  return [...prev, incoming].sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
+}
+
+function getCustomerOutgoingStatus(message) {
+  if (message.sender !== "customer") return "";
+  if (message.read_by_admin_at) return "Read";
+  if (message.delivered_to_admin_at) return "Delivered";
+  return "Sent";
+}
+
 async function ensureSession() {
   const { data, error } = await supabase.auth.getSession();
   if (error) throw error;
@@ -482,6 +505,7 @@ async function ensureSession() {
   const { data: anon, error: anonError } =
     await supabase.auth.signInAnonymously();
   if (anonError) throw anonError;
+
   return anon.session;
 }
 
@@ -515,7 +539,7 @@ async function fetchMessages(conversationId) {
   const { data, error } = await supabase
     .from("messages")
     .select(
-      "id, conversation_id, sender, content, attachment_url, attachment_type, created_at",
+      "id,conversation_id,sender,content,attachment_url,attachment_type,created_at,delivered_to_admin_at,delivered_to_customer_at,read_by_admin_at,read_by_customer_at",
     )
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: true });
@@ -537,7 +561,6 @@ async function uploadChatFile({ conversationId, file }) {
     });
 
   if (upErr) throw upErr;
-
   return { bucket: "chat-uploads", path };
 }
 
@@ -558,11 +581,23 @@ export default function ChatWidget() {
   const [busy, setBusy] = useState(false);
   const [bootError, setBootError] = useState("");
   const [conversationId, setConversationId] = useState(null);
+  const [customerUserId, setCustomerUserId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [file, setFile] = useState(null);
   const [signedMap, setSignedMap] = useState({});
+  const [adminOnline, setAdminOnline] = useState(false);
+  const [typingAdmin, setTypingAdmin] = useState(false);
+
   const bottomRef = useRef(null);
+  const dbChannelRef = useRef(null);
+  const metaChannelRef = useRef(null);
+  const adminPresenceChannelRef = useRef(null);
+  const audioRef = useRef(null);
+  const hydratedRef = useRef(false);
+  const typingTimeoutRef = useRef(null);
+  const adminTypingTimeoutRef = useRef(null);
+  const isTypingRef = useRef(false);
 
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -571,9 +606,68 @@ export default function ChatWidget() {
   const startPosRef = useRef({ x: 0, y: 0 });
   const buttonRef = useRef(null);
 
-  const canSend = useMemo(() => {
-    return !busy && (text.trim().length > 0 || !!file) && !!conversationId;
-  }, [busy, text, file, conversationId]);
+  const canSend = useMemo(
+    () => !busy && !!conversationId && (text.trim().length > 0 || !!file),
+    [busy, conversationId, text, file],
+  );
+
+  const playNotification = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  }, []);
+
+  const markDeliveredAsCustomer = useCallback(async (cid) => {
+    if (!cid) return;
+    await supabase.rpc("customer_mark_conversation_delivered", {
+      p_conversation_id: cid,
+    });
+  }, []);
+
+  const markReadAsCustomer = useCallback(
+    async (cid) => {
+      if (!cid || !open || document.visibilityState !== "visible") return;
+
+      const { error } = await supabase.rpc("customer_mark_conversation_read", {
+        p_conversation_id: cid,
+      });
+
+      if (error) return;
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.sender === "admin" && !m.read_by_customer_at
+            ? {
+                ...m,
+                delivered_to_customer_at:
+                  m.delivered_to_customer_at || new Date().toISOString(),
+                read_by_customer_at: new Date().toISOString(),
+              }
+            : m,
+        ),
+      );
+    },
+    [open],
+  );
+
+  const sendTyping = useCallback(
+    async (typing) => {
+      const channel = metaChannelRef.current;
+      if (!channel || !conversationId) return;
+
+      await channel.send({
+        type: "broadcast",
+        event: "typing",
+        payload: {
+          actor: "customer",
+          conversationId,
+          typing,
+        },
+      });
+    },
+    [conversationId],
+  );
 
   useEffect(() => {
     function setInitialPosition() {
@@ -598,19 +692,16 @@ export default function ChatWidget() {
   }
 
   function handlePointerMove(e) {
-    if (!buttonRef.current) return;
-    if (e.pressure === 0) return;
+    if (!buttonRef.current || e.pressure === 0) return;
 
     const dx = e.clientX - pointerStartRef.current.x;
     const dy = e.clientY - pointerStartRef.current.y;
     const distance = Math.hypot(dx, dy);
-    const dragThreshold = 5;
-    const isDraggingNow = distance > dragThreshold;
+    const dragging = distance > 5;
 
-    if (isDraggingNow) {
+    if (dragging) {
       const nextX = startPosRef.current.x + dx;
       const nextY = startPosRef.current.y + dy;
-
       const size = 56;
       const margin = 24;
       const maxX = window.innerWidth - size - margin;
@@ -622,8 +713,8 @@ export default function ChatWidget() {
       });
     }
 
-    draggingRef.current = isDraggingNow;
-    setIsDragging(isDraggingNow);
+    draggingRef.current = dragging;
+    setIsDragging(dragging);
   }
 
   function handlePointerUp(e) {
@@ -649,6 +740,8 @@ export default function ChatWidget() {
         const session = await ensureSession();
         if (!alive) return;
 
+        setCustomerUserId(session.user.id);
+
         const cid = await getOrCreateConversation(session.user.id);
         if (!alive) return;
 
@@ -658,9 +751,11 @@ export default function ChatWidget() {
         if (!alive) return;
 
         setMessages(initial);
+        hydratedRef.current = true;
+
+        await markDeliveredAsCustomer(cid);
       } catch (e) {
-        if (!alive) return;
-        setBootError(e?.message || "Chat failed to start.");
+        if (alive) setBootError(e?.message || "Chat failed to start.");
       } finally {
         if (alive) setBusy(false);
       }
@@ -669,13 +764,50 @@ export default function ChatWidget() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [markDeliveredAsCustomer]);
+
+  useEffect(() => {
+    if (!customerUserId) return;
+
+    const channel = supabase.channel("support-admin-presence", {
+      config: { private: true },
+    });
+
+    channel
+      .on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState();
+        const entries = Object.values(state).flat();
+        const online = entries.some((item) => item?.role === "admin");
+        setAdminOnline(online);
+      })
+      .subscribe();
+
+    adminPresenceChannelRef.current = channel;
+
+    return () => {
+      if (adminPresenceChannelRef.current) {
+        supabase.removeChannel(adminPresenceChannelRef.current);
+        adminPresenceChannelRef.current = null;
+      }
+    };
+  }, [customerUserId]);
 
   useEffect(() => {
     if (!conversationId) return;
 
-    const channel = supabase
-      .channel(`chat:${conversationId}`)
+    if (dbChannelRef.current) {
+      supabase.removeChannel(dbChannelRef.current);
+      dbChannelRef.current = null;
+    }
+
+    if (metaChannelRef.current) {
+      metaChannelRef.current.untrack().catch(() => {});
+      supabase.removeChannel(metaChannelRef.current);
+      metaChannelRef.current = null;
+    }
+
+    const dbChannel = supabase
+      .channel(`customer-messages-db-${conversationId}`)
       .on(
         "postgres_changes",
         {
@@ -684,51 +816,166 @@ export default function ChatWidget() {
           table: "messages",
           filter: `conversation_id=eq.${conversationId}`,
         },
-        (payload) => {
+        async (payload) => {
           const incoming = payload.new;
           if (!incoming?.id) return;
 
-          setMessages((prev) => {
-            const exists = prev.some((m) => m.id === incoming.id);
-            if (exists) return prev;
-            return [...prev, incoming];
-          });
+          const isIncomingAdminMessage = incoming.sender === "admin";
+
+          setMessages((prev) => upsertMessages(prev, incoming));
+
+          if (isIncomingAdminMessage) {
+            await markDeliveredAsCustomer(conversationId);
+
+            if (open && document.visibilityState === "visible") {
+              await markReadAsCustomer(conversationId);
+            }
+
+            if (hydratedRef.current) {
+              playNotification();
+            }
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          const incoming = payload.new;
+          if (!incoming?.id) return;
+          setMessages((prev) => upsertMessages(prev, incoming));
         },
       )
       .subscribe();
 
+    dbChannelRef.current = dbChannel;
+
+    if (customerUserId) {
+      const metaChannel = supabase.channel(`chat-meta-${conversationId}`, {
+        config: {
+          private: true,
+          presence: { key: `customer:${customerUserId}` },
+        },
+      });
+
+      metaChannel
+        .on("broadcast", { event: "typing" }, ({ payload }) => {
+          if (payload?.actor !== "admin") return;
+
+          const typing = Boolean(payload?.typing);
+          setTypingAdmin(typing);
+
+          if (adminTypingTimeoutRef.current) {
+            clearTimeout(adminTypingTimeoutRef.current);
+          }
+
+          if (typing) {
+            adminTypingTimeoutRef.current = setTimeout(() => {
+              setTypingAdmin(false);
+            }, 1500);
+          }
+        })
+        .on("presence", { event: "sync" }, () => {})
+        .subscribe(async (status) => {
+          if (status === "SUBSCRIBED") {
+            await metaChannel.track({
+              role: "customer",
+              user_id: customerUserId,
+              conversation_id: conversationId,
+              online_at: new Date().toISOString(),
+            });
+          }
+        });
+
+      metaChannelRef.current = metaChannel;
+    }
+
+    (async () => {
+      const latest = await fetchMessages(conversationId);
+      setMessages(latest);
+      await markDeliveredAsCustomer(conversationId);
+      if (open && document.visibilityState === "visible") {
+        await markReadAsCustomer(conversationId);
+      }
+      hydratedRef.current = true;
+    })();
+
     return () => {
-      supabase.removeChannel(channel);
+      if (dbChannelRef.current) {
+        supabase.removeChannel(dbChannelRef.current);
+        dbChannelRef.current = null;
+      }
+
+      if (metaChannelRef.current) {
+        metaChannelRef.current.untrack().catch(() => {});
+        supabase.removeChannel(metaChannelRef.current);
+        metaChannelRef.current = null;
+      }
+
+      if (adminTypingTimeoutRef.current) {
+        clearTimeout(adminTypingTimeoutRef.current);
+        adminTypingTimeoutRef.current = null;
+      }
+
+      setTypingAdmin(false);
     };
-  }, [conversationId]);
+  }, [
+    conversationId,
+    customerUserId,
+    open,
+    markDeliveredAsCustomer,
+    markReadAsCustomer,
+    playNotification,
+  ]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, open]);
 
   useEffect(() => {
+    if (!conversationId || !open) return;
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        markReadAsCustomer(conversationId);
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisible);
+    onVisible();
+
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [conversationId, open, markReadAsCustomer]);
+
+  useEffect(() => {
     let alive = true;
 
     (async () => {
-      const need = messages
-        .filter((m) => m.attachment_url)
-        .map((m) => m.attachment_url)
-        .filter((u) => !signedMap[u]);
+      const needed = [
+        ...new Set(
+          messages
+            .filter((m) => m.attachment_url)
+            .map((m) => m.attachment_url)
+            .filter((key) => !signedMap[key]),
+        ),
+      ];
 
-      if (need.length === 0) return;
+      if (needed.length === 0) return;
 
-      const next = { ...signedMap };
-      for (const key of need) {
+      const additions = {};
+      for (const key of needed) {
         try {
-          const url = await getSignedUrl(key);
-          next[key] = url;
-        } catch {
-          // ignore
-        }
+          additions[key] = await getSignedUrl(key);
+        } catch {}
       }
 
-      if (!alive) return;
-      setSignedMap(next);
+      if (!alive || Object.keys(additions).length === 0) return;
+      setSignedMap((prev) => ({ ...prev, ...additions }));
     })();
 
     return () => {
@@ -736,11 +983,41 @@ export default function ChatWidget() {
     };
   }, [messages, signedMap]);
 
+  const handleTextChange = async (value) => {
+    setText(value);
+
+    if (!conversationId) return;
+
+    const hasValue = value.trim().length > 0;
+
+    if (hasValue && !isTypingRef.current) {
+      isTypingRef.current = true;
+      await sendTyping(true);
+    }
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    typingTimeoutRef.current = setTimeout(async () => {
+      if (isTypingRef.current) {
+        isTypingRef.current = false;
+        await sendTyping(false);
+      }
+    }, 1200);
+
+    if (!hasValue && isTypingRef.current) {
+      isTypingRef.current = false;
+      await sendTyping(false);
+    }
+  };
+
   async function sendMessage(e) {
     e.preventDefault();
     if (!canSend) return;
 
     setBusy(true);
+
     try {
       let attachment_url = null;
       let attachment_type = null;
@@ -753,7 +1030,7 @@ export default function ChatWidget() {
 
       const content = text.trim();
 
-      const { data: newMessage, error } = await supabase
+      const { data, error } = await supabase
         .from("messages")
         .insert({
           conversation_id: conversationId,
@@ -763,20 +1040,20 @@ export default function ChatWidget() {
           attachment_type,
         })
         .select(
-          "id, conversation_id, sender, content, attachment_url, attachment_type, created_at",
+          "id,conversation_id,sender,content,attachment_url,attachment_type,created_at,delivered_to_admin_at,delivered_to_customer_at,read_by_admin_at,read_by_customer_at",
         )
         .single();
 
       if (error) throw error;
 
-      setMessages((prev) => {
-        const exists = prev.some((m) => m.id === newMessage.id);
-        if (exists) return prev;
-        return [...prev, newMessage];
-      });
-
+      setMessages((prev) => upsertMessages(prev, data));
       setText("");
       setFile(null);
+
+      if (isTypingRef.current) {
+        isTypingRef.current = false;
+        await sendTyping(false);
+      }
     } catch (e2) {
       alert(e2?.message || "Failed to send.");
     } finally {
@@ -786,6 +1063,12 @@ export default function ChatWidget() {
 
   return (
     <>
+      <audio
+        ref={audioRef}
+        preload="auto"
+        src="/sounds/chat-notification.mp3"
+      />
+
       <button
         ref={buttonRef}
         type="button"
@@ -794,28 +1077,40 @@ export default function ChatWidget() {
         onPointerUp={handlePointerUp}
         onClick={handleButtonClick}
         aria-label="Open chat support"
-        style={{
-          left: position.x,
-          top: position.y,
-        }}
+        style={{ left: position.x, top: position.y }}
         className={cx(
-          "fixed z-[80] h-14 w-14 rounded-full bg-[#F5A200] shadow-[0_14px_40px_rgba(0,0,0,0.28)]",
-          "flex items-center justify-center transition-transform duration-200 hover:scale-105",
+          "fixed z-[80] flex h-14 w-14 items-center justify-center rounded-full bg-[#F5A200]",
+          "shadow-[0_14px_40px_rgba(0,0,0,0.28)] transition-transform duration-200 hover:scale-105",
           isDragging ? "cursor-grabbing" : "cursor-grab",
         )}
       >
         <MessageCircle className="h-6 w-6 text-white" />
       </button>
 
-      {open && (
+      {open ? (
         <div className="fixed bottom-24 right-5 z-[80] w-[92vw] max-w-[420px] overflow-hidden rounded-2xl border border-slate-200 bg-white/90 text-slate-900 shadow-[0_18px_60px_rgba(0,0,0,0.15)]">
           <div className="flex items-center justify-between border-b border-slate-200 bg-slate-100 px-4 py-3">
             <div>
               <div className="text-sm font-bold">Support Chat</div>
-              <div className="text-[11px] text-slate-500">
-                Reply time depends on availability
+              <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+                <span
+                  className={cx(
+                    "rounded-full px-2 py-0.5",
+                    adminOnline
+                      ? "bg-green-100 text-green-700"
+                      : "bg-slate-100 text-slate-600",
+                  )}
+                >
+                  {adminOnline ? "Admin online" : "Admin offline"}
+                </span>
+                {typingAdmin ? (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">
+                    Admin typing…
+                  </span>
+                ) : null}
               </div>
             </div>
+
             <button
               onClick={() => setOpen(false)}
               className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold hover:bg-slate-200"
@@ -831,7 +1126,7 @@ export default function ChatWidget() {
               </div>
             ) : null}
 
-            {messages.length === 0 && !bootError ? (
+            {!bootError && messages.length === 0 ? (
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                 Ask a question or upload payment proof.
               </div>
@@ -843,6 +1138,7 @@ export default function ChatWidget() {
                 const signed = m.attachment_url
                   ? signedMap[m.attachment_url]
                   : "";
+                const outgoingStatus = getCustomerOutgoingStatus(m);
 
                 return (
                   <div
@@ -860,10 +1156,27 @@ export default function ChatWidget() {
                           : "bg-slate-50 text-slate-700",
                       )}
                     >
-                      {m.content ? <div>{m.content}</div> : null}
+                      <div
+                        className={cx(
+                          "text-[11px]",
+                          isMe ? "text-black/70" : "text-slate-500",
+                        )}
+                      >
+                        {new Date(m.created_at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                        {outgoingStatus ? ` • ${outgoingStatus}` : ""}
+                      </div>
+
+                      {m.content ? (
+                        <div className="mt-1 whitespace-pre-wrap break-words">
+                          {m.content}
+                        </div>
+                      ) : null}
 
                       {m.attachment_url ? (
-                        <div className={cx(m.content ? "mt-2" : "")}>
+                        <div className={cx(m.content ? "mt-2" : "mt-1")}>
                           {signed ? (
                             <a
                               className={cx(
@@ -901,20 +1214,21 @@ export default function ChatWidget() {
                 <input
                   type="file"
                   className="hidden"
+                  accept="image/*,application/pdf"
                   onChange={(e) => setFile(e.target.files?.[0] || null)}
                 />
               </label>
 
               <input
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(e) => handleTextChange(e.target.value)}
                 placeholder="Type your message..."
                 className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
               />
 
               <button
                 type="submit"
-                disabled={busy}
+                disabled={!canSend}
                 className="rounded-xl bg-yellow-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
               >
                 {busy ? "..." : "Send"}
@@ -923,7 +1237,7 @@ export default function ChatWidget() {
 
             {file ? (
               <div className="mt-2 text-xs text-slate-500">
-                Selected: {file.name}{" "}
+                Selected: {file.name}
                 <button
                   type="button"
                   className="ml-2 underline"
@@ -935,7 +1249,7 @@ export default function ChatWidget() {
             ) : null}
           </form>
         </div>
-      )}
+      ) : null}
     </>
   );
 }
