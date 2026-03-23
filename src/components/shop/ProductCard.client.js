@@ -17,7 +17,7 @@ export default function ProductCard({ product }) {
   return (
     <Link
       href={`/shop/${product.slug}`}
-      className="group block bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col transition-all duration-300 ease-out hover:shadow-xl hover:-translate-y-1"
+      className="group block cursor-pointer bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col transition-all duration-300 ease-out hover:shadow-xl hover:-translate-y-1"
     >
       <div className="relative aspect-[4/3] bg-white flex items-center justify-center p-8 overflow-hidden group-hover:bg-gradient-to-b group-hover:from-white group-hover:to-slate-50 transition-colors duration-300">
         <Image
@@ -46,7 +46,7 @@ export default function ProductCard({ product }) {
           Pay on delivery / bank transfer
         </div>
 
-        <button className="relative w-full py-3 rounded-xl font-semibold text-white bg-orange-500 transition-all duration-200 hover:bg-orange-600 hover:shadow-md active:scale-[0.98] before:absolute before:inset-0 before:rounded-xl before:bg-white/10 before:opacity-0 hover:before:opacity-100 before:transition-opacity">
+        <button className="cursor-pointer relative w-full py-3 rounded-xl font-semibold text-white bg-orange-500 transition-all duration-200 hover:bg-orange-600 hover:shadow-md active:scale-[0.98] before:absolute before:inset-0 before:rounded-xl before:bg-white/10 before:opacity-0 hover:before:opacity-100 before:transition-opacity">
           View product
         </button>
       </div>
