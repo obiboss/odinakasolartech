@@ -217,14 +217,14 @@ export default function ProductsPanel() {
       {mode === "list" ? (
         <button
           onClick={startNew}
-          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold hover:bg-slate-100"
+          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold hover:bg-slate-100 cursor-pointer"
         >
           + New product
         </button>
       ) : (
         <button
           onClick={backToList}
-          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold hover:bg-slate-100"
+          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold hover:bg-slate-100 cursor-pointer"
         >
           Back
         </button>
@@ -301,13 +301,13 @@ export default function ProductsPanel() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => startEdit(p)}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold hover:bg-slate-100"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold hover:bg-slate-100 cursor-pointer"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => deleteProduct(p.id)}
-                        className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-500/15"
+                        className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-500/15 cursor-pointer"
                       >
                         Delete
                       </button>
@@ -428,7 +428,7 @@ export default function ProductsPanel() {
                   disabled={saving}
                   onClick={upsertProduct}
                   className={cx(
-                    "rounded-2xl px-4 py-3 text-sm font-semibold transition",
+                    "rounded-2xl px-4 py-3 text-sm font-semibold transition cursor-pointer disabled:cursor-not-allowed",
                     "bg-white text-black hover:opacity-95 disabled:opacity-60",
                   )}
                 >

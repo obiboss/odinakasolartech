@@ -87,6 +87,8 @@ export default function ChatPanel() {
   const [text, setText] = useState("");
   const [signedMap, setSignedMap] = useState({});
 
+  const [mobileListOpen, setMobileListOpen] = useState(false);
+
   const [adminUserId, setAdminUserId] = useState(null);
   const [customerOnline, setCustomerOnline] = useState(false);
   const [typingCustomer, setTypingCustomer] = useState(false);
@@ -105,6 +107,11 @@ export default function ChatPanel() {
   const active = useMemo(
     () => convos.find((c) => c.id === activeId) || null,
     [activeId, convos],
+  );
+
+  const canSend = useMemo(
+    () => !sending && !!activeId && text.trim().length > 0,
+    [sending, activeId, text],
   );
 
   const scrollToBottom = useCallback(() => {
@@ -170,11 +177,21 @@ export default function ChatPanel() {
     }));
 
     setConvos(rows);
-    setActiveId((prev) => prev || rows[0]?.id || null);
+
+    // Do not auto-push mobile users into a thread view unexpectedly.
+    setActiveId((prev) => {
+      if (prev && rows.some((r) => r.id === prev)) return prev;
+      return rows[0]?.id || null;
+    });
   }, []);
 
   const loadMessages = useCallback(
     async (conversationId) => {
+      if (!conversationId) {
+        setMessages([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("messages")
         .select(
@@ -280,136 +297,96 @@ export default function ChatPanel() {
   }, [adminUserId]);
 
   useEffect(() => {
-    const channel = supabase
-      .channel("admin-conversations")
+    if (convoChannelRef.current) {
+      supabase.removeChannel(convoChannelRef.current);
+      convoChannelRef.current = null;
+    }
+
+    if (allMessagesChannelRef.current) {
+      supabase.removeChannel(allMessagesChannelRef.current);
+      allMessagesChannelRef.current = null;
+    }
+
+    const convoChannel = supabase
+      .channel("admin-conversations-all")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "conversations" },
-        (payload) => {
-          const newConvo = payload.new;
-          if (!newConvo?.id) return;
-
-          setConvos((prev) =>
-            upsertSortedConversations(prev, { ...newConvo, unread_count: 0 }),
-          );
-          setActiveId((prev) => prev || newConvo.id);
+        {
+          event: "*",
+          schema: "public",
+          table: "conversations",
         },
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "conversations" },
-        (payload) => {
-          const updated = payload.new;
-          if (!updated?.id) return;
-
-          setConvos((prev) => {
-            const existing = prev.find((c) => c.id === updated.id);
-            return upsertSortedConversations(prev, {
-              ...updated,
-              unread_count: existing?.unread_count || 0,
-            });
-          });
+        () => {
+          loadConversations();
         },
       )
       .subscribe();
 
-    convoChannelRef.current = channel;
+    const allMessagesChannel = supabase
+      .channel("admin-messages-all")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+        },
+        async (payload) => {
+          const incoming = payload.new;
+          if (!incoming?.conversation_id) return;
+
+          const isCustomerMessage = incoming.sender === "customer";
+
+          setConvos((prev) =>
+            upsertSortedConversations(prev, {
+              id: incoming.conversation_id,
+              last_message_at: incoming.created_at,
+              created_at: incoming.created_at,
+              unread_count:
+                incoming.conversation_id === activeId ? 0 : undefined,
+            }),
+          );
+
+          if (incoming.conversation_id === activeId) {
+            setMessages((prev) => upsertMessageList(prev, incoming));
+
+            await markDeliveredAsAdmin(activeId);
+            if (document.visibilityState === "visible") {
+              await markReadAsAdmin(activeId);
+            }
+
+            scrollToBottom();
+          }
+
+          if (isCustomerMessage) {
+            playNotification();
+            loadConversations();
+          }
+        },
+      )
+      .subscribe();
+
+    convoChannelRef.current = convoChannel;
+    allMessagesChannelRef.current = allMessagesChannel;
 
     return () => {
       if (convoChannelRef.current) {
         supabase.removeChannel(convoChannelRef.current);
         convoChannelRef.current = null;
       }
-    };
-  }, []);
-
-  useEffect(() => {
-    const channel = supabase
-      .channel("admin-messages-all")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages" },
-        async (payload) => {
-          const msg = payload.new;
-          if (!msg?.id || !msg?.conversation_id) return;
-
-          setConvos((prev) => {
-            const visibleActive =
-              msg.conversation_id === activeId &&
-              document.visibilityState === "visible";
-
-            let found = false;
-            const next = prev.map((c) => {
-              if (c.id !== msg.conversation_id) return c;
-              found = true;
-
-              const shouldIncrement =
-                msg.sender === "customer" && !visibleActive;
-
-              return {
-                ...c,
-                last_message_at: msg.created_at,
-                unread_count: shouldIncrement
-                  ? Number(c.unread_count || 0) + 1
-                  : visibleActive
-                    ? 0
-                    : Number(c.unread_count || 0),
-              };
-            });
-
-            if (!found) {
-              next.push({
-                id: msg.conversation_id,
-                customer_id: null,
-                status: "open",
-                created_at: msg.created_at,
-                last_message_at: msg.created_at,
-                unread_count:
-                  msg.sender === "customer" &&
-                  !(
-                    msg.conversation_id === activeId &&
-                    document.visibilityState === "visible"
-                  )
-                    ? 1
-                    : 0,
-              });
-            }
-
-            next.sort(
-              (a, b) =>
-                new Date(b.last_message_at || b.created_at).getTime() -
-                new Date(a.last_message_at || a.created_at).getTime(),
-            );
-
-            return next;
-          });
-
-          if (msg.sender === "customer") {
-            await markDeliveredAsAdmin(msg.conversation_id);
-
-            const shouldReadNow =
-              msg.conversation_id === activeId &&
-              document.visibilityState === "visible";
-
-            if (shouldReadNow) {
-              await markReadAsAdmin(msg.conversation_id);
-            } else {
-              playNotification();
-            }
-          }
-        },
-      )
-      .subscribe();
-
-    allMessagesChannelRef.current = channel;
-
-    return () => {
       if (allMessagesChannelRef.current) {
         supabase.removeChannel(allMessagesChannelRef.current);
         allMessagesChannelRef.current = null;
       }
     };
-  }, [activeId, markDeliveredAsAdmin, markReadAsAdmin, playNotification]);
+  }, [
+    activeId,
+    loadConversations,
+    markDeliveredAsAdmin,
+    markReadAsAdmin,
+    playNotification,
+    scrollToBottom,
+  ]);
 
   useEffect(() => {
     if (!activeId) {
@@ -418,8 +395,6 @@ export default function ChatPanel() {
       setTypingCustomer(false);
       return;
     }
-
-    loadMessages(activeId);
 
     if (activeDbChannelRef.current) {
       supabase.removeChannel(activeDbChannelRef.current);
@@ -432,8 +407,10 @@ export default function ChatPanel() {
       activeMetaChannelRef.current = null;
     }
 
+    loadMessages(activeId);
+
     const dbChannel = supabase
-      .channel(`admin-messages-db-${activeId}`)
+      .channel(`admin-active-messages-${activeId}`)
       .on(
         "postgres_changes",
         {
@@ -447,15 +424,16 @@ export default function ChatPanel() {
           if (!incoming?.id) return;
 
           setMessages((prev) => upsertMessageList(prev, incoming));
-          scrollToBottom();
 
           if (incoming.sender === "customer") {
             await markDeliveredAsAdmin(activeId);
-
             if (document.visibilityState === "visible") {
               await markReadAsAdmin(activeId);
             }
+            playNotification();
           }
+
+          scrollToBottom();
         },
       )
       .on(
@@ -467,9 +445,9 @@ export default function ChatPanel() {
           filter: `conversation_id=eq.${activeId}`,
         },
         (payload) => {
-          const updated = payload.new;
-          if (!updated?.id) return;
-          setMessages((prev) => upsertMessageList(prev, updated));
+          const incoming = payload.new;
+          if (!incoming?.id) return;
+          setMessages((prev) => upsertMessageList(prev, incoming));
         },
       )
       .subscribe();
@@ -477,10 +455,10 @@ export default function ChatPanel() {
     activeDbChannelRef.current = dbChannel;
 
     if (adminUserId) {
-      const metaChannel = supabase.channel(`chat-meta-${activeId}`, {
+      const metaChannel = supabase.channel(`admin-chat-meta-${activeId}`, {
         config: {
           private: true,
-          presence: { key: `admin:${adminUserId}` },
+          presence: { key: `admin:${adminUserId}:${activeId}` },
         },
       });
 
@@ -547,17 +525,26 @@ export default function ChatPanel() {
     loadMessages,
     markDeliveredAsAdmin,
     markReadAsAdmin,
+    playNotification,
     scrollToBottom,
   ]);
 
   useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+
+  useEffect(() => {
+    if (!activeId) return;
+
     const onVisible = () => {
-      if (document.visibilityState === "visible" && activeId) {
+      if (document.visibilityState === "visible") {
         markReadAsAdmin(activeId);
       }
     };
 
     document.addEventListener("visibilitychange", onVisible);
+    onVisible();
+
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [activeId, markReadAsAdmin]);
 
@@ -621,338 +608,346 @@ export default function ChatPanel() {
     }
   };
 
-  async function send() {
-    if (!activeId) return;
+  async function sendMessage(e) {
+    e.preventDefault();
+    if (!canSend) return;
 
-    const content = text.trim();
-    if (!content) return;
+    try {
+      setSending(true);
 
-    setSending(true);
-    setErr("");
+      const content = text.trim();
 
-    const { data, error } = await supabase
-      .from("messages")
-      .insert({
-        conversation_id: activeId,
-        sender: "admin",
-        content,
-      })
-      .select(
-        "id,conversation_id,sender,content,attachment_url,attachment_type,created_at,delivered_to_admin_at,delivered_to_customer_at,read_by_admin_at,read_by_customer_at",
-      )
-      .single();
+      const { data, error } = await supabase
+        .from("messages")
+        .insert({
+          conversation_id: activeId,
+          sender: "admin",
+          content,
+        })
+        .select(
+          "id,conversation_id,sender,content,attachment_url,attachment_type,created_at,delivered_to_admin_at,delivered_to_customer_at,read_by_admin_at,read_by_customer_at",
+        )
+        .single();
 
-    setSending(false);
+      if (error) throw error;
 
-    if (error) {
-      setErr(error.message);
-      return;
-    }
+      setMessages((prev) => upsertMessageList(prev, data));
+      setText("");
+      scrollToBottom();
 
-    setMessages((prev) => upsertMessageList(prev, data));
-    setText("");
-    if (isTypingRef.current) {
-      isTypingRef.current = false;
-      await sendTyping(false);
-    }
-    scrollToBottom();
-  }
-
-  async function uploadChatFile(file) {
-    if (!activeId) return;
-
-    setSending(true);
-    setErr("");
-
-    const ext = (file.name.split(".").pop() || "bin").toLowerCase();
-    const path = `chat/${activeId}/${crypto.randomUUID()}.${ext}`;
-
-    const upload = await supabase.storage
-      .from("chat-uploads")
-      .upload(path, file, {
-        cacheControl: "3600",
-        upsert: false,
-        contentType: file.type || "application/octet-stream",
-      });
-
-    if (upload.error) {
+      if (isTypingRef.current) {
+        isTypingRef.current = false;
+        await sendTyping(false);
+      }
+    } catch (e) {
+      setErr(e?.message || "Failed to send message.");
+    } finally {
       setSending(false);
-      setErr(upload.error.message);
-      return;
     }
-
-    const attachment_url = `chat-uploads/${path}`;
-
-    const { data, error } = await supabase
-      .from("messages")
-      .insert({
-        conversation_id: activeId,
-        sender: "admin",
-        content: file.name,
-        attachment_url,
-        attachment_type: file.type || "application/octet-stream",
-      })
-      .select(
-        "id,conversation_id,sender,content,attachment_url,attachment_type,created_at,delivered_to_admin_at,delivered_to_customer_at,read_by_admin_at,read_by_customer_at",
-      )
-      .single();
-
-    setSending(false);
-
-    if (error) {
-      setErr(error.message);
-      return;
-    }
-
-    setMessages((prev) => upsertMessageList(prev, data));
-    scrollToBottom();
   }
 
-  async function setStatus(status) {
-    if (!activeId) return;
+  function handleSelectConversation(id) {
+    setActiveId(id);
+    setMobileListOpen(false);
+  }
 
-    const { error } = await supabase
-      .from("conversations")
-      .update({ status })
-      .eq("id", activeId);
+  function renderConversationList() {
+    return (
+      <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white/90">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <div className="text-sm font-bold text-slate-900">Chats</div>
+          <div className="mt-1 text-xs text-slate-500">
+            Select a conversation to reply.
+          </div>
+        </div>
 
-    if (error) {
-      setErr(error.message);
-      return;
-    }
+        <div className="flex-1 overflow-y-auto p-2">
+          {loading ? (
+            <div className="px-3 py-3 text-sm text-slate-500">Loading...</div>
+          ) : err ? (
+            <div className="px-3 py-3 text-sm text-rose-600">{err}</div>
+          ) : convos.length === 0 ? (
+            <div className="px-3 py-3 text-sm text-slate-500">
+              No conversations yet.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {convos.map((c) => {
+                const isActive = c.id === activeId;
+                const unread = Number(c.unread_count || 0);
 
-    setConvos((prev) =>
-      prev.map((c) => (c.id === activeId ? { ...c, status } : c)),
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => handleSelectConversation(c.id)}
+                    className={cx(
+                      "w-full rounded-2xl border px-3 py-3 text-left transition cursor-pointer",
+                      isActive
+                        ? "border-amber-300 bg-amber-50"
+                        : "border-slate-200 bg-white hover:bg-slate-50",
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold text-slate-900">
+                          {c.customer_name || c.customer_phone || "Customer"}
+                        </div>
+                        <div className="mt-1 truncate text-xs text-slate-500">
+                          {c.customer_phone || "No phone"}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-1">
+                        <div className="text-[11px] text-slate-400">
+                          {formatTime(c.last_message_at || c.created_at)}
+                        </div>
+                        {unread > 0 ? (
+                          <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold text-black">
+                            {unread}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="mt-2 truncate text-xs text-slate-600">
+                      {c.last_message_preview || "Open conversation"}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white/90 p-5">
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
       <audio
         ref={audioRef}
         preload="auto"
         src="/sounds/chat-notification.mp3"
       />
-      <h3 className="text-lg font-bold">Chat</h3>
-      <p className="mt-1 text-sm text-slate-600">
-        Handle multiple chats in one place.
-      </p>
 
-      {err ? (
-        <div className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-700">
-          {err}
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-bold text-slate-900">Customer Chats</h3>
+          <p className="text-sm text-slate-600">
+            Reply to customer questions, orders, and payment confirmations.
+          </p>
         </div>
-      ) : null}
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-12">
-        <div className="lg:col-span-4">
-          <div className="rounded-2xl border border-slate-200 bg-white/90 p-3">
-            <div className="flex items-center justify-between px-2 py-2">
-              <div className="text-sm font-semibold">Conversations</div>
-              <button
-                onClick={loadConversations}
-                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold hover:bg-slate-100"
-              >
-                Refresh
-              </button>
+        <button
+          type="button"
+          onClick={() => setMobileListOpen(true)}
+          className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 md:hidden cursor-pointer"
+        >
+          Chats
+        </button>
+      </div>
+
+      <div className="flex h-[600px] overflow-hidden rounded-2xl">
+        {/* Desktop sidebar */}
+        <div className="hidden w-[320px] flex-shrink-0 pr-3 md:block">
+          {renderConversationList()}
+        </div>
+
+        {/* Mobile slide-over list */}
+        {mobileListOpen ? (
+          <div className="fixed inset-0 z-[70] md:hidden">
+            <button
+              type="button"
+              aria-label="Close chat list"
+              className="absolute inset-0 bg-black/40"
+              onClick={() => setMobileListOpen(false)}
+            />
+            <div className="absolute left-0 top-0 h-full w-[88vw] max-w-[360px] bg-white p-3 shadow-2xl">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="text-sm font-bold text-slate-900">
+                  Conversations
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMobileListOpen(false)}
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="h-[calc(100%-48px)]">
+                {renderConversationList()}
+              </div>
             </div>
-
-            {loading ? (
-              <div className="px-2 py-3 text-sm text-slate-600">Loading…</div>
-            ) : convos.length === 0 ? (
-              <div className="px-2 py-3 text-sm text-slate-600">
-                No conversations yet.
-              </div>
-            ) : (
-              <div className="mt-2 grid gap-2">
-                {convos.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => setActiveId(c.id)}
-                    className={cx(
-                      "w-full rounded-2xl border px-3 py-3 text-left transition",
-                      c.id === activeId
-                        ? "border-amber-500/30 bg-amber-500/10"
-                        : "border-slate-200 bg-slate-50 hover:bg-slate-100",
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="truncate text-sm font-semibold">
-                        {c.customer_id || "Customer"}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {Number(c.unread_count || 0) > 0 ? (
-                          <span className="min-w-6 rounded-full bg-red-600 px-2 py-0.5 text-center text-[11px] font-bold text-white">
-                            {c.unread_count}
-                          </span>
-                        ) : null}
-
-                        <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">
-                          {c.status || "open"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mt-1 text-xs text-slate-500">
-                      {formatDateTime(c.last_message_at || c.created_at)}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
-        </div>
+        ) : null}
 
-        <div className="lg:col-span-8">
-          <div className="rounded-2xl border border-slate-200 bg-white/90 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-sm font-semibold">
-                  {active ? `Chat: ${active.customer_id}` : "Select a chat"}
-                </div>
-
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                  <span>Status: {active?.status || "—"}</span>
-                  {activeId ? (
-                    <span
-                      className={cx(
-                        "rounded-full px-2 py-0.5",
-                        customerOnline
-                          ? "bg-green-100 text-green-700"
-                          : "bg-slate-100 text-slate-600",
-                      )}
-                    >
-                      {customerOnline ? "Customer online" : "Customer offline"}
-                    </span>
-                  ) : null}
-                  {typingCustomer ? (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">
-                      Customer typing…
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setStatus("open")}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold hover:bg-slate-100"
-                >
-                  Mark open
-                </button>
-                <button
-                  onClick={() => setStatus("closed")}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold hover:bg-slate-100"
-                >
-                  Mark closed
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-4 h-[380px] overflow-auto rounded-2xl border border-slate-200 bg-white p-3">
-              {!activeId ? (
-                <div className="text-sm text-slate-600">
-                  Select a conversation to view messages.
-                </div>
-              ) : messages.length === 0 ? (
-                <div className="text-sm text-slate-600">No messages yet.</div>
-              ) : (
-                <div className="grid gap-2">
-                  {messages.map((m) => {
-                    const signed = m.attachment_url
-                      ? signedMap[m.attachment_url]
-                      : "";
-                    const outgoingStatus = getAdminOutgoingStatus(m);
-
-                    return (
-                      <div
-                        key={m.id}
+        {/* Chat pane */}
+        <div className="min-w-0 flex-1">
+          <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white/90">
+            {active ? (
+              <>
+                <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-bold text-slate-900">
+                      {active.customer_name ||
+                        active.customer_phone ||
+                        "Customer"}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                      <span>{active.customer_phone || "No phone"}</span>
+                      <span
                         className={cx(
-                          "max-w-[92%] rounded-2xl border px-3 py-2 text-sm",
-                          m.sender === "admin"
-                            ? "ml-auto border-amber-500/20 bg-amber-500/10"
-                            : "mr-auto border-slate-200 bg-slate-50",
+                          "rounded-full px-2 py-0.5",
+                          customerOnline
+                            ? "bg-green-100 text-green-700"
+                            : "bg-slate-100 text-slate-600",
                         )}
                       >
-                        <div className="text-xs text-slate-500">
-                          {m.sender} • {formatTime(m.created_at)}
-                          {outgoingStatus ? ` • ${outgoingStatus}` : ""}
-                        </div>
+                        {customerOnline
+                          ? "Customer online"
+                          : "Customer offline"}
+                      </span>
+                      {typingCustomer ? (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">
+                          Customer typing…
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
 
-                        {m.content ? (
-                          <div className="mt-1 whitespace-pre-wrap break-words text-slate-900">
-                            {m.content}
-                          </div>
-                        ) : null}
-
-                        {m.attachment_url ? (
-                          signed ? (
-                            <a
-                              className="mt-2 inline-block text-xs font-semibold text-amber-600 underline"
-                              href={signed}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Open attachment
-                            </a>
-                          ) : (
-                            <div className="mt-2 text-xs text-slate-500">
-                              Loading attachment…
-                            </div>
-                          )
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                  <div ref={bottomRef} />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMobileListOpen(true)}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold md:hidden cursor-pointer"
+                    >
+                      Chats
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
 
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <input
-                value={text}
-                onChange={(e) => handleTextChange(e.target.value)}
-                placeholder="Type a reply…"
-                className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500/30"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    send();
-                  }
-                }}
-              />
+                <div className="flex-1 overflow-y-auto px-3 py-3">
+                  {messages.length === 0 ? (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                      No messages yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {messages.map((m) => {
+                        const isMe = m.sender === "admin";
+                        const signed = m.attachment_url
+                          ? signedMap[m.attachment_url]
+                          : "";
+                        const outgoingStatus = getAdminOutgoingStatus(m);
 
-              <div className="flex gap-2">
-                <label className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold hover:bg-slate-100">
-                  Upload
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    className="hidden"
-                    disabled={!activeId || sending}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) uploadChatFile(f);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
+                        return (
+                          <div
+                            key={m.id}
+                            className={cx(
+                              "flex",
+                              isMe ? "justify-end" : "justify-start",
+                            )}
+                          >
+                            <div
+                              className={cx(
+                                "max-w-[85%] rounded-2xl px-3 py-2 text-sm",
+                                isMe
+                                  ? "bg-slate-900 text-white"
+                                  : "bg-amber-50 text-slate-800",
+                              )}
+                            >
+                              <div
+                                className={cx(
+                                  "text-[11px]",
+                                  isMe ? "text-white/70" : "text-slate-500",
+                                )}
+                              >
+                                {formatTime(m.created_at)}
+                                {outgoingStatus ? ` • ${outgoingStatus}` : ""}
+                              </div>
 
-                <button
-                  onClick={send}
-                  disabled={!activeId || sending}
-                  className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black transition hover:opacity-95 disabled:opacity-60"
+                              {m.content ? (
+                                <div className="mt-1 whitespace-pre-wrap break-words">
+                                  {m.content}
+                                </div>
+                              ) : null}
+
+                              {m.attachment_url ? (
+                                <div
+                                  className={cx(m.content ? "mt-2" : "mt-1")}
+                                >
+                                  {signed ? (
+                                    <a
+                                      href={signed}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className={cx(
+                                        "text-xs underline",
+                                        isMe
+                                          ? "text-white/80"
+                                          : "text-slate-600",
+                                      )}
+                                    >
+                                      View attachment
+                                    </a>
+                                  ) : (
+                                    <div className="text-xs opacity-70">
+                                      Loading attachment…
+                                    </div>
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div ref={bottomRef} />
+                    </div>
+                  )}
+                </div>
+
+                <form
+                  onSubmit={sendMessage}
+                  className="border-t border-slate-200 bg-slate-50 p-3"
                 >
-                  Send
-                </button>
-              </div>
-            </div>
+                  <div className="flex gap-2">
+                    <input
+                      value={text}
+                      onChange={(e) => handleTextChange(e.target.value)}
+                      placeholder="Type your reply..."
+                      className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
+                    />
 
-            <div className="mt-3 text-xs text-slate-500">
-              Customers can send messages and attachments here in realtime.
-            </div>
+                    <button
+                      type="submit"
+                      disabled={!canSend}
+                      className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      {sending ? "..." : "Send"}
+                    </button>
+                  </div>
+
+                  <div className="mt-2 text-[11px] text-slate-500">
+                    {active.last_message_at ? (
+                      <>
+                        Last activity: {formatDateTime(active.last_message_at)}
+                      </>
+                    ) : (
+                      <>
+                        Conversation created:{" "}
+                        {formatDateTime(active.created_at)}
+                      </>
+                    )}
+                  </div>
+                </form>
+              </>
+            ) : (
+              <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-500">
+                Select a conversation to view messages.
+              </div>
+            )}
           </div>
         </div>
       </div>

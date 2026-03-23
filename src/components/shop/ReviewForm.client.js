@@ -72,7 +72,7 @@ export default function ReviewForm({ productId }) {
 
       <button
         disabled={busy}
-        className="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-900 hover:opacity-90 disabled:opacity-60"
+        className="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-900 hover:opacity-90 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
       >
         {busy ? "Submitting..." : "Submit review"}
       </button>

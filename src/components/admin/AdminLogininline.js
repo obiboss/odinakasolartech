@@ -62,7 +62,7 @@ export default function AdminLoginInline({ errorText = "" }) {
 
           <button
             disabled={busy}
-            className="w-full rounded-2xl bg-yellow-500 px-4 py-3 text-sm font-semibold text-black disabled:opacity-60"
+            className="w-full rounded-2xl bg-yellow-500 px-4 py-3 text-sm font-semibold text-black disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
           >
             {busy ? "Signing in..." : "Sign in"}
           </button>

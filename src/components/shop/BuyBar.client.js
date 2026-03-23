@@ -1,4 +1,3 @@
-// src/components/shop/BuyBar.client.js
 "use client";
 
 import { useState } from "react";
@@ -6,7 +5,7 @@ import { useCart } from "@/components/cart/CartContext.client";
 import { formatCurrency } from "@/lib/formatCurrency";
 
 export default function BuyBar({ product, waLink }) {
-  const { addItem } = useCart();
+  const { addItem, openCart } = useCart();
   const [added, setAdded] = useState(false);
 
   function onAddToCart() {
@@ -16,6 +15,8 @@ export default function BuyBar({ product, waLink }) {
       price: product.price ?? 0,
       image: product.images?.[0]?.image_url,
     });
+
+    openCart();
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1500);
   }
@@ -34,10 +35,11 @@ export default function BuyBar({ product, waLink }) {
           <button
             type="button"
             onClick={onAddToCart}
-            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:opacity-90"
+            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:opacity-90 cursor-pointer"
           >
             {added ? "Added" : "Add to cart"}
           </button>
+
           <a
             href={waLink}
             target="_blank"

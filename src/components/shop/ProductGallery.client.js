@@ -35,7 +35,7 @@ export default function ProductGallery({ images = [], name = "" }) {
             <button
               key={u}
               onClick={() => setActive(u)}
-              className="shrink-0 rounded-xl border border-slate-200 bg-white p-1 hover:bg-slate-50 transition"
+              className="shrink-0 rounded-xl border border-slate-200 bg-white p-1 hover:bg-slate-50 transition cursor-pointer"
               aria-label="Select image"
             >
               <Image

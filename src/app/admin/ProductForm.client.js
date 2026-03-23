@@ -232,7 +232,7 @@ export default function ProductForm({
               type="button"
               onClick={deleteProduct}
               disabled={busy}
-              className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-500/15"
+              className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-500/15 cursor-pointer disabled:cursor-not-allowed"
             >
               Delete
             </button>
@@ -331,7 +331,7 @@ export default function ProductForm({
 
           <button
             disabled={busy}
-            className="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-60"
+            className="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
           >
             {busy ? "Saving..." : "Save Product"}
           </button>
