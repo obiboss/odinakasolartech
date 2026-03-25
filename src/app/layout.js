@@ -1,6 +1,7 @@
 import "./globals.css";
 import ThemeProvider from "@/components/providers/ThemeProvider";
 import { CartProvider } from "@/components/cart/CartContext.client";
+import { GlobalLoaderProvider } from "@/components/ui/GlobalLoaderProvider.client";
 
 export const metadata = {
   metadataBase: new URL("https://www.odinakachukwusolartech.com"),
@@ -20,7 +21,9 @@ export default function RootLayout({ children }) {
     <html lang="en" suppressHydrationWarning>
       <body>
         <ThemeProvider>
-          <CartProvider>{children}</CartProvider>
+          <GlobalLoaderProvider>
+            <CartProvider>{children}</CartProvider>
+          </GlobalLoaderProvider>
         </ThemeProvider>
       </body>
     </html>

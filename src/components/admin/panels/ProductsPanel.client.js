@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase/client";
 
 function cx(...a) {
@@ -17,10 +18,39 @@ function slugify(input) {
     .replace(/(^-|-$)/g, "");
 }
 
+function formatPrice(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function safeId() {
+  try {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+  } catch {}
+  return `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function extractStoragePathFromPublicUrl(url) {
+  const marker = "/storage/v1/object/public/product-images/";
+  const idx = String(url || "").indexOf(marker);
+  if (idx === -1) return null;
+  return url.slice(idx + marker.length);
+}
+
+function generateImageUploadPath(productId, ext) {
+  const safeExt = ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "jpg";
+  return `${productId}/${Date.now()}-${Math.random().toString(16).slice(2)}.${safeExt}`;
+}
+
 export default function ProductsPanel() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState("");
+
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
 
@@ -36,10 +66,50 @@ export default function ProductsPanel() {
     description: "",
   });
 
+  const [images, setImages] = useState([]);
+  const [pendingFiles, setPendingFiles] = useState([]);
+
   const editingProduct = useMemo(
     () => products.find((p) => p.id === editingId) || null,
     [editingId, products],
   );
+
+  const primaryImage = useMemo(() => {
+    if (images?.[0]?.image_url) return images[0].image_url;
+    if (pendingFiles?.[0]?.previewUrl) return pendingFiles[0].previewUrl;
+    return null;
+  }, [images, pendingFiles]);
+
+  const allPreviewThumbs = useMemo(
+    () => [
+      ...(images || []).map((img) => ({
+        id: img.id,
+        image_url: img.image_url,
+        persisted: true,
+      })),
+      ...(pendingFiles || []).map((item) => ({
+        id: item.id,
+        image_url: item.previewUrl,
+        persisted: false,
+        name: item.name,
+      })),
+    ],
+    [images, pendingFiles],
+  );
+
+  useEffect(() => {
+    loadAll();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      pendingFiles.forEach((item) => {
+        try {
+          URL.revokeObjectURL(item.previewUrl);
+        } catch {}
+      });
+    };
+  }, [pendingFiles]);
 
   async function loadAll() {
     setLoading(true);
@@ -54,7 +124,7 @@ export default function ProductsPanel() {
         supabase
           .from("products")
           .select(
-            "id,name,slug,price,description,featured,category_id,created_at,product_images(image_url)",
+            "id,name,slug,price,description,featured,category_id,created_at,product_images(id,image_url)",
           )
           .order("created_at", { ascending: false }),
       ]);
@@ -67,14 +137,20 @@ export default function ProductsPanel() {
     setLoading(false);
   }
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => {
-    loadAll();
-  }, []);
+  function resetPendingFiles() {
+    pendingFiles.forEach((item) => {
+      try {
+        URL.revokeObjectURL(item.previewUrl);
+      } catch {}
+    });
+    setPendingFiles([]);
+  }
 
   function startNew() {
+    resetPendingFiles();
     setMode("new");
     setEditingId(null);
+    setImages([]);
     setForm({
       name: "",
       urlName: "",
@@ -87,8 +163,10 @@ export default function ProductsPanel() {
   }
 
   function startEdit(p) {
+    resetPendingFiles();
     setMode("edit");
     setEditingId(p.id);
+    setImages(Array.isArray(p.product_images) ? p.product_images : []);
     setForm({
       name: p.name || "",
       urlName: p.slug || "",
@@ -101,12 +179,60 @@ export default function ProductsPanel() {
   }
 
   function backToList() {
+    resetPendingFiles();
     setMode("list");
     setEditingId(null);
+    setImages([]);
     setErr("");
   }
 
-  async function upsertProduct() {
+  async function uploadFilesForProduct(productId, files) {
+    if (!productId || !files.length) return [];
+
+    const insertedRows = [];
+
+    for (const file of files) {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = generateImageUploadPath(productId, ext);
+
+      const up = await supabase.storage
+        .from("product-images")
+        .upload(path, file, {
+          cacheControl: "31536000",
+          upsert: false,
+          contentType: file.type || "image/jpeg",
+        });
+
+      if (up.error) {
+        throw new Error(up.error.message);
+      }
+
+      const pub = supabase.storage.from("product-images").getPublicUrl(path);
+      const image_url = pub?.data?.publicUrl;
+
+      if (!image_url) {
+        throw new Error(
+          "Upload succeeded, but public URL could not be created.",
+        );
+      }
+
+      const ins = await supabase
+        .from("product_images")
+        .insert({ product_id: productId, image_url })
+        .select("id, product_id, image_url")
+        .single();
+
+      if (ins.error) {
+        throw new Error(ins.error.message);
+      }
+
+      insertedRows.push(ins.data);
+    }
+
+    return insertedRows;
+  }
+
+  async function saveProduct() {
     setSaving(true);
     setErr("");
 
@@ -115,94 +241,203 @@ export default function ProductsPanel() {
 
     if (!name) {
       setSaving(false);
-      return setErr("Product name is required.");
+      setErr("Product name is required.");
+      return;
     }
+
     if (!slug) {
       setSaving(false);
-      return setErr("URL name is required.");
+      setErr("URL name is required.");
+      return;
     }
 
     const payload = {
       name,
       slug,
-      price: form.price === "" ? null : Number(form.price),
+      price: formatPrice(form.price),
       description: form.description || null,
       featured: !!form.featured,
       category_id: form.category_id || null,
     };
 
     let res;
+
     if (mode === "edit" && editingId) {
-      res = await supabase.from("products").update(payload).eq("id", editingId);
+      res = await supabase
+        .from("products")
+        .update(payload)
+        .eq("id", editingId)
+        .select("id")
+        .single();
     } else {
-      res = await supabase.from("products").insert(payload);
+      res = await supabase
+        .from("products")
+        .insert(payload)
+        .select("id")
+        .single();
     }
 
     if (res.error) {
       setSaving(false);
-      return setErr(res.error.message);
+      setErr(res.error.message);
+      return;
     }
 
-    await loadAll();
-    setSaving(false);
-    backToList();
+    const productId = res.data.id;
+
+    try {
+      if (pendingFiles.length > 0) {
+        setUploading(true);
+
+        const uploadedRows = await uploadFilesForProduct(
+          productId,
+          pendingFiles.map((x) => x.file),
+        );
+
+        if (!uploadedRows.length) {
+          throw new Error("Image upload failed.");
+        }
+
+        setImages((prev) => [...prev, ...uploadedRows]);
+        resetPendingFiles();
+      }
+
+      await loadAll();
+      setSaving(false);
+      setUploading(false);
+      backToList();
+    } catch (error) {
+      setSaving(false);
+      setUploading(false);
+      setErr(error?.message || "Product saved, but image upload failed.");
+    }
+  }
+
+  async function uploadFilesNow() {
+    if (!editingId || pendingFiles.length === 0) return;
+
+    setUploading(true);
+    setErr("");
+
+    try {
+      const uploadedRows = await uploadFilesForProduct(
+        editingId,
+        pendingFiles.map((x) => x.file),
+      );
+
+      setImages((prev) => [...prev, ...uploadedRows]);
+      resetPendingFiles();
+      await loadAll();
+    } catch (error) {
+      setErr(error?.message || "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function deleteProduct(id) {
-    if (!confirm("Delete this product?")) return;
-    const { error } = await supabase.from("products").delete().eq("id", id);
-    if (error) return setErr(error.message);
-    await loadAll();
-  }
-
-  async function uploadImage(file) {
-    if (!editingId)
-      return setErr("Save the product first, then upload images.");
+    const ok = confirm("Delete this product?");
+    if (!ok) return;
 
     setSaving(true);
     setErr("");
 
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    const path = `products/${editingId}/${crypto.randomUUID()}.${ext}`;
+    const target = products.find((p) => p.id === id);
+    const productImages = target?.product_images || [];
 
-    const up = await supabase.storage
-      .from("product-images")
-      .upload(path, file, {
-        cacheControl: "3600",
-        upsert: false,
-      });
+    try {
+      const paths = productImages
+        .map((img) => extractStoragePathFromPublicUrl(img.image_url))
+        .filter(Boolean);
 
-    if (up.error) {
-      setSaving(false);
-      return setErr(up.error.message);
+      if (paths.length > 0) {
+        await supabase.storage.from("product-images").remove(paths);
+      }
+    } catch {}
+
+    const { error } = await supabase.from("products").delete().eq("id", id);
+
+    setSaving(false);
+
+    if (error) {
+      setErr(error.message);
+      return;
     }
 
-    const { data } = supabase.storage.from("product-images").getPublicUrl(path);
-    const publicUrl = data?.publicUrl;
-
-    const ins = await supabase
-      .from("product_images")
-      .insert({ product_id: editingId, image_url: publicUrl });
-
-    if (ins.error) {
-      setSaving(false);
-      return setErr(ins.error.message);
+    if (editingId === id) {
+      backToList();
     }
 
     await loadAll();
-    setSaving(false);
   }
 
-  async function removeImage(productId, url) {
-    // DB delete first (storage cleanup optional)
+  async function removeImage(imageRow) {
+    const ok = confirm("Remove this image?");
+    if (!ok) return;
+
+    setSaving(true);
+    setErr("");
+
+    try {
+      const path = extractStoragePathFromPublicUrl(imageRow.image_url);
+      if (path) {
+        await supabase.storage.from("product-images").remove([path]);
+      }
+    } catch {}
+
     const { error } = await supabase
       .from("product_images")
       .delete()
-      .eq("product_id", productId)
-      .eq("image_url", url);
+      .eq("id", imageRow.id);
 
-    if (error) return setErr(error.message);
+    setSaving(false);
+
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+
+    setImages((prev) => prev.filter((img) => img.id !== imageRow.id));
     await loadAll();
+  }
+
+  function removePendingFile(id) {
+    setPendingFiles((prev) => {
+      const target = prev.find((x) => x.id === id);
+      if (target?.previewUrl) {
+        try {
+          URL.revokeObjectURL(target.previewUrl);
+        } catch {}
+      }
+      return prev.filter((x) => x.id !== id);
+    });
+  }
+
+  function onSelectFiles(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    setErr("");
+
+    const validFiles = files.filter((file) =>
+      ["image/png", "image/jpeg", "image/webp"].includes(file.type),
+    );
+
+    if (validFiles.length === 0) {
+      setErr("Only PNG, JPG, JPEG, and WEBP images are allowed.");
+      e.target.value = "";
+      return;
+    }
+
+    const prepared = validFiles.map((file) => ({
+      id: safeId(),
+      file,
+      previewUrl: URL.createObjectURL(file),
+      name: file.name,
+    }));
+
+    setPendingFiles((prev) => [...prev, ...prepared]);
+    e.target.value = "";
   }
 
   const header = (
@@ -277,6 +512,7 @@ export default function ProductsPanel() {
                           />
                         ) : null}
                       </div>
+
                       <div>
                         <div className="flex items-center gap-2">
                           <div className="font-semibold">{p.name}</div>
@@ -286,6 +522,7 @@ export default function ProductsPanel() {
                             </span>
                           )}
                         </div>
+
                         <div className="mt-0.5 text-xs text-slate-500">
                           URL name:{" "}
                           <span className="font-semibold">{p.slug}</span>
@@ -328,7 +565,9 @@ export default function ProductsPanel() {
                 {mode === "new" ? "New product" : "Edit product"}
               </div>
               <div className="mt-1 text-xs text-slate-500">
-                “URL name” is used in the link (good for SEO). Keep it short.
+                {mode === "new"
+                  ? "Create the product and upload images in one save."
+                  : "Update the product and upload more images when needed."}
               </div>
 
               <div className="mt-4 grid gap-3">
@@ -425,14 +664,20 @@ export default function ProductsPanel() {
                 </label>
 
                 <button
-                  disabled={saving}
-                  onClick={upsertProduct}
+                  disabled={saving || uploading}
+                  onClick={saveProduct}
                   className={cx(
                     "rounded-2xl px-4 py-3 text-sm font-semibold transition cursor-pointer disabled:cursor-not-allowed",
                     "bg-white text-black hover:opacity-95 disabled:opacity-60",
                   )}
                 >
-                  {saving ? "Saving…" : "Save product"}
+                  {saving || uploading
+                    ? mode === "new"
+                      ? "Creating product & uploading images…"
+                      : "Saving…"
+                    : mode === "new"
+                      ? "Create product"
+                      : "Save product"}
                 </button>
               </div>
             </div>
@@ -440,53 +685,106 @@ export default function ProductsPanel() {
 
           <div className="lg:col-span-5">
             <div className="rounded-2xl border border-slate-200 bg-white/90 p-4">
-              <div className="text-sm font-semibold">Images</div>
-              <div className="mt-1 text-xs text-slate-500">
-                Save the product first, then upload images.
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold">Images</div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {mode === "new"
+                      ? "Select images now. They will upload when you save the product."
+                      : "Select images now and upload them immediately, or save them together with other changes."}
+                  </div>
+                </div>
+
+                {mode === "edit" && pendingFiles.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={uploadFilesNow}
+                    disabled={uploading || saving}
+                    className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-500/15 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {uploading ? "Uploading..." : "Upload selected"}
+                  </button>
+                ) : null}
               </div>
 
               <div className="mt-4">
                 <input
+                  id="product-image-picker"
                   type="file"
-                  accept="image/*"
-                  disabled={saving || !editingId}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) uploadImage(f);
-                    e.target.value = "";
-                  }}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
+                  accept="image/png,image/jpeg,image/webp"
+                  multiple
+                  onChange={onSelectFiles}
+                  disabled={saving || uploading}
+                  className="hidden"
                 />
+
+                <label
+                  htmlFor="product-image-picker"
+                  className={cx(
+                    "inline-flex cursor-pointer rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold hover:bg-slate-50",
+                    saving || uploading ? "pointer-events-none opacity-60" : "",
+                  )}
+                >
+                  Select images
+                </label>
+              </div>
+
+              <div className="mt-4">
+                {primaryImage ? (
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                    <Image
+                      src={primaryImage}
+                      alt="Primary product image"
+                      fill
+                      className="object-cover"
+                      sizes="520px"
+                      unoptimized={primaryImage.startsWith("blob:")}
+                    />
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+                    No images selected yet.
+                  </div>
+                )}
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-3">
-                {(editingProduct?.product_images || []).map((img) => (
+                {allPreviewThumbs.map((img) => (
                   <div
-                    key={img.image_url}
-                    className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
+                    key={img.id}
+                    className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={img.image_url}
-                      alt=""
-                      className="h-28 w-full object-cover"
-                    />
-                    <button
-                      onClick={() => removeImage(editingId, img.image_url)}
-                      className="absolute right-2 top-2 rounded-xl border border-red-500/25 bg-red-500/10 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-500/15"
-                    >
-                      Remove
-                    </button>
+                    <div className="relative h-28 w-full">
+                      <Image
+                        src={img.image_url}
+                        alt="Product"
+                        fill
+                        className="object-cover"
+                        sizes="220px"
+                        unoptimized={img.image_url.startsWith("blob:")}
+                      />
+                    </div>
+
+                    {img.persisted ? (
+                      <button
+                        type="button"
+                        onClick={() => removeImage(img)}
+                        className="absolute right-2 top-2 rounded-xl border border-red-500/25 bg-red-500/10 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-500/15"
+                      >
+                        Remove
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => removePendingFile(img.id)}
+                        className="absolute right-2 top-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-500/15"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
-
-              {editingId &&
-              (editingProduct?.product_images || []).length === 0 ? (
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                  No images yet.
-                </div>
-              ) : null}
             </div>
 
             <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-900">

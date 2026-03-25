@@ -1,7 +1,7 @@
-// src/components/search/HeaderSearch.client.js
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 function money(n) {
@@ -11,14 +11,18 @@ function money(n) {
 
 function useDebouncedValue(value, delay = 250) {
   const [v, setV] = useState(value);
+
   useEffect(() => {
     const t = setTimeout(() => setV(value), delay);
     return () => clearTimeout(t);
   }, [value, delay]);
+
   return v;
 }
 
 export default function HeaderSearch() {
+  const router = useRouter();
+
   const [q, setQ] = useState("");
   const dq = useDebouncedValue(q, 250);
 
@@ -30,6 +34,7 @@ export default function HeaderSearch() {
 
   const wrapRef = useRef(null);
 
+  const trimmedQ = q.trim();
   const canSearch = useMemo(() => dq.trim().length >= 2, [dq]);
 
   useEffect(() => {
@@ -37,6 +42,7 @@ export default function HeaderSearch() {
 
     async function run() {
       setErr("");
+
       if (!canSearch) {
         setItems([]);
         setBusy(false);
@@ -44,11 +50,13 @@ export default function HeaderSearch() {
       }
 
       setBusy(true);
+
       try {
         const res = await fetch(
           `/api/search/products?q=${encodeURIComponent(dq.trim())}`,
           { cache: "no-store" },
         );
+
         const json = await res.json();
         if (cancelled) return;
 
@@ -58,7 +66,7 @@ export default function HeaderSearch() {
         } else {
           setItems(json?.items || []);
         }
-      } catch (e) {
+      } catch {
         if (!cancelled) {
           setErr("Search failed");
           setItems([]);
@@ -69,50 +77,75 @@ export default function HeaderSearch() {
     }
 
     run();
+
     return () => {
       cancelled = true;
     };
   }, [dq, canSearch]);
 
-  // Close on outside click
   useEffect(() => {
     function onDoc(e) {
       if (!wrapRef.current) return;
       if (!wrapRef.current.contains(e.target)) setOpen(false);
     }
+
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  // Keyboard navigation
+  function goToShopSearch(value) {
+    const nextQ = value.trim();
+    setOpen(false);
+
+    if (!nextQ) {
+      router.push("/shop");
+      return;
+    }
+
+    router.push(`/shop?q=${encodeURIComponent(nextQ)}`);
+  }
+
+  function goToProduct(slug) {
+    setOpen(false);
+    router.push(`/shop/${slug}`);
+  }
+
   function onKeyDown(e) {
     if (!open) return;
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setActiveIndex((i) => Math.min(i + 1, items.length - 1));
+      return;
     }
+
     if (e.key === "ArrowUp") {
       e.preventDefault();
       setActiveIndex((i) => Math.max(i - 1, -1));
+      return;
     }
+
     if (e.key === "Escape") {
       e.preventDefault();
       setOpen(false);
+      return;
     }
+
     if (e.key === "Enter") {
-      // If a suggestion is highlighted, follow it
+      e.preventDefault();
+
       if (activeIndex >= 0 && items[activeIndex]) {
-        const it = items[activeIndex];
-        window.location.href = `/shop/${it.slug}`;
+        goToProduct(items[activeIndex].slug);
       } else {
-        // Otherwise go to shop listing search
-        window.location.href = `/shop?q=${encodeURIComponent(q.trim())}`;
+        goToShopSearch(q);
       }
     }
   }
 
   const showDropdown = open && q.trim().length > 0;
+  const viewAllHref = trimmedQ
+    ? `/shop?q=${encodeURIComponent(trimmedQ)}`
+    : "/shop";
 
   return (
     <div ref={wrapRef} className="relative w-full max-w-[520px]">
@@ -142,8 +175,9 @@ export default function HeaderSearch() {
               setItems([]);
               setErr("");
               setActiveIndex(-1);
+              setOpen(false);
             }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
             aria-label="Clear search"
           >
             Clear
@@ -152,19 +186,20 @@ export default function HeaderSearch() {
       </div>
 
       {showDropdown ? (
-        <div className="absolute left-0 right-0 mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
+        <div className="absolute left-0 right-0 mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg z-50">
           <div className="px-4 py-2 text-xs text-slate-600 border-b border-slate-100 flex items-center justify-between">
             <span>
               {busy
-                ? "Searching…"
+                ? "Searching..."
                 : err
                   ? err
                   : canSearch
                     ? `${items.length} result(s)`
                     : "Type at least 2 characters"}
             </span>
+
             <Link
-              href={`/shop?q=${encodeURIComponent(q.trim())}`}
+              href={viewAllHref}
               className="font-semibold text-slate-900 hover:underline"
               onClick={() => setOpen(false)}
             >
@@ -190,7 +225,6 @@ export default function HeaderSearch() {
                   >
                     <div className="h-12 w-12 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shrink-0">
                       {img ? (
-                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={img}
                           alt={it.name}

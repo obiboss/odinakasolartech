@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import ProductGrid from "@/components/shop/ProductGrid.client";
 import CategoryChips from "@/components/shop/CategoryChips.client";
 import ShopSearch from "@/components/shop/ShopSearch.client";
@@ -10,25 +11,34 @@ export default function ShopClient({
   categories = [],
   initialCat = "all",
   initialQ = "",
+  totalProducts = 0,
+  page = 1,
+  pageSize = 24,
 }) {
-  const [cat, setCat] = useState(initialCat);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [q, setQ] = useState(initialQ);
 
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
+  function handleSearchSubmit(e) {
+    e.preventDefault();
 
-    if (!s) return initialProducts;
+    const params = new URLSearchParams(searchParams.toString());
+    const trimmed = q.trim();
 
-    return initialProducts.filter((p) =>
-      String(p.name || "")
-        .toLowerCase()
-        .includes(s),
-    );
-  }, [initialProducts, q]);
+    if (trimmed) {
+      params.set("q", trimmed);
+      params.set("page", "1");
+    } else {
+      params.delete("q");
+      params.delete("page");
+    }
+
+    router.push(`/shop?${params.toString()}`);
+  }
 
   return (
     <div className="space-y-5">
-      {/* HEADER / FILTER AREA */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -39,27 +49,23 @@ export default function ShopClient({
             </h1>
 
             <div className="mt-1 text-sm text-slate-600">
-              Prices visible. Confirm availability via WhatsApp or in-app chat.
+              Browse solar panels, inverters, batteries, accessories, and more.
+              Prices are visible. Confirm availability via WhatsApp or in-app
+              chat.
             </div>
           </div>
 
-          <ShopSearch value={q} onChange={setQ} />
+          <ShopSearch value={q} onChange={setQ} onSubmit={handleSearchSubmit} />
         </div>
 
         <div className="mt-4">
-          <CategoryChips
-            categories={categories}
-            value={cat}
-            onChange={setCat}
-          />
+          <CategoryChips categories={categories} />
         </div>
       </div>
 
-      {/* PRODUCTS GRID */}
-      <ProductGrid items={filtered} />
+      <ProductGrid items={initialProducts} />
 
-      {/* EMPTY STATE */}
-      {!filtered.length ? (
+      {!initialProducts.length ? (
         <div className="text-sm text-slate-600">No products found.</div>
       ) : null}
     </div>

@@ -9,6 +9,9 @@ export const metadata = {
   title: "Shop — Odinaka Solar Tech",
   description:
     "Shop solar panels, inverters, batteries, charge controllers, cables, breakers and accessories in Nigeria.",
+  alternates: {
+    canonical: "/shop",
+  },
 };
 
 export const revalidate = 300;
@@ -22,10 +25,15 @@ Categories rarely change, so we cache them
 const getCategories = cache(async () => {
   const supabase = await createClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("categories")
-    .select("id,name,parent_id")
-    .order("name");
+    .select("id, name, slug, parent_id")
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.log("SUPABASE ERROR (categories):", error);
+    return [];
+  }
 
   return data || [];
 });
@@ -47,10 +55,16 @@ export default async function ShopPage({ searchParams }) {
   */
   const allCategories = await getCategories();
 
+  /*
+  TOP-LEVEL CATEGORIES ONLY
+  These are the ones we want to expose as SEO landing-page entry points.
+  */
   const categories = allCategories.filter((c) => !c.parent_id);
 
   /*
   DETERMINE CATEGORY FILTER
+  If a top-level category is selected by ?cat=,
+  include its direct children as well.
   */
   let categoryIds = [];
 
@@ -102,7 +116,7 @@ export default async function ShopPage({ searchParams }) {
   const { data: products, count, error } = await query;
 
   if (error) {
-    console.log("SUPABASE ERROR:", error);
+    console.log("SUPABASE ERROR (products):", error);
   }
 
   return (

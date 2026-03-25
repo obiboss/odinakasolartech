@@ -1,4 +1,5 @@
-// src/app/shop/[slug]/page.js
+// src/app/(site)/shop/[slug]/page.js
+
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import Container from "@/components/ui/Container";
@@ -10,10 +11,10 @@ import { getStore } from "@/lib/content.server";
 import ProductReviews from "@/components/shop/ProductReviews.server";
 import RelatedProducts from "@/components/shop/RelatedProducts.server";
 import FeaturedCarousel from "@/components/shop/FeaturedCarousel.client";
+import JsonLd from "@/components/seo/JsonLd";
 
 export const revalidate = 300;
 
-// Shared cached query used by BOTH generateMetadata and ProductPage
 const getProductBySlug = cache(async (slug) => {
   const supabase = await createClient();
 
@@ -70,7 +71,7 @@ const getProductBySlug = cache(async (slug) => {
 async function getRelatedProducts(categoryId, productId) {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from("products")
     .select(
       `
@@ -91,13 +92,7 @@ async function getRelatedProducts(categoryId, productId) {
     .eq("active", true)
     .eq("category_id", categoryId)
     .neq("id", productId)
-    .order("sort_order", { foreignTable: "product_images", ascending: true })
     .limit(8);
-
-  if (error) {
-    console.log("SUPABASE ERROR (related):", error);
-    return [];
-  }
 
   return data || [];
 }
@@ -105,7 +100,7 @@ async function getRelatedProducts(categoryId, productId) {
 async function getFeaturedProducts(productId) {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from("products")
     .select(
       `
@@ -126,13 +121,7 @@ async function getFeaturedProducts(productId) {
     .eq("active", true)
     .eq("featured", true)
     .neq("id", productId)
-    .order("sort_order", { foreignTable: "product_images", ascending: true })
     .limit(10);
-
-  if (error) {
-    console.log("SUPABASE ERROR (featured):", error);
-    return [];
-  }
 
   return data || [];
 }
@@ -148,15 +137,36 @@ export async function generateMetadata({ params }) {
   const metaDescription =
     product.short_description ||
     product.description ||
-    "Buy solar products in Nigeria. Prices visible. Confirm via WhatsApp or in-app chat.";
+    "Buy solar products in Nigeria. Prices available.";
+
+  const image = product.images?.[0]?.image_url;
 
   return {
-    title: `${product.name} — Odinaka Solar Tech`,
+    title: `${product.name} Price in Nigeria | Odinaka Solar Tech`,
     description: metaDescription,
+    alternates: {
+      canonical: `/shop/${product.slug}`,
+    },
     openGraph: {
       title: product.name,
       description: metaDescription,
+      url: `/shop/${product.slug}`,
       type: "website",
+      images: image
+        ? [
+            {
+              url: image,
+              width: 1200,
+              height: 900,
+            },
+          ]
+        : [],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: product.name,
+      description: metaDescription,
+      images: image ? [image] : [],
     },
   };
 }
@@ -165,7 +175,6 @@ export default async function ProductPage({ params }) {
   const { slug } = await params;
 
   const product = await getProductBySlug(slug);
-
   if (!product) return notFound();
 
   const [relatedProducts, featured] = await Promise.all([
@@ -174,6 +183,7 @@ export default async function ProductPage({ params }) {
   ]);
 
   const store = getStore();
+
   const wa = whatsappLink({
     phone: store.business.whatsapp,
     message: `Hello ${store.business.name}, I want to buy: ${product.name}. Please confirm availability and delivery.`,
@@ -181,6 +191,29 @@ export default async function ProductPage({ params }) {
 
   return (
     <Container className="py-8 sm:py-10">
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "Product",
+          name: product.name,
+          image: product.images?.map((i) => i.image_url),
+          description: product.description,
+          url: `https://www.odinakachukwusolartech.com/shop/${product.slug}`,
+          brand: {
+            "@type": "Brand",
+            name: "Odinaka Solar Tech",
+          },
+          offers: {
+            "@type": "Offer",
+            priceCurrency: "NGN",
+            price: product.price,
+            availability: product.in_stock
+              ? "https://schema.org/InStock"
+              : "https://schema.org/OutOfStock",
+          },
+        }}
+      />
+
       <div className="grid gap-6 lg:grid-cols-12">
         <div className="lg:col-span-7">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -198,7 +231,7 @@ export default async function ProductPage({ params }) {
               {product.name}
             </h1>
 
-            <div className="mt-2 text-sm leading-relaxed text-slate-700 whitespace-pre-line">
+            <div className="mt-2 text-sm leading-relaxed whitespace-pre-line text-slate-700">
               {product.description || "No description yet."}
             </div>
 
