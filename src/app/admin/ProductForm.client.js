@@ -9,8 +9,11 @@ function slugify(str) {
   return String(str || "")
     .toLowerCase()
     .trim()
+    .replace(/₦/g, "naira")
+    .replace(/&/g, "and")
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)+/g, "");
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 90);
 }
 
 function formatNGN(value) {
@@ -129,40 +132,79 @@ export default function ProductForm({
     return insertedRows;
   }
 
+  async function ensureUniqueSlug(baseSlug, currentProductId = null) {
+    let finalSlug = baseSlug;
+    let counter = 2;
+
+    while (true) {
+      let query = supabase
+        .from("products")
+        .select("id")
+        .eq("slug", finalSlug)
+        .maybeSingle();
+
+      if (currentProductId) {
+        query = query.neq("id", currentProductId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (!data) {
+        return finalSlug;
+      }
+
+      finalSlug = `${baseSlug}-${counter}`;
+      counter += 1;
+    }
+  }
+
   async function saveProduct(e) {
     e.preventDefault();
     setBusy(true);
     setUploading(true);
     setError("");
 
-    const payload = {
-      name,
-      slug: slugify(slug || name),
-      price: formatNGN(price),
-      description,
-      category_id: categoryId || null,
-      featured,
-    };
-
-    const res = isEdit
-      ? await supabase
-          .from("products")
-          .update(payload)
-          .eq("id", initialProduct.id)
-          .select("id")
-          .single()
-      : await supabase.from("products").insert(payload).select("id").single();
-
-    if (res.error) {
-      setBusy(false);
-      setUploading(false);
-      setError(res.error.message);
-      return;
-    }
-
-    const productId = res.data.id;
-
     try {
+      const baseSlug = slugify(slug || name);
+
+      if (!baseSlug) {
+        throw new Error("Product slug is required.");
+      }
+
+      const uniqueSlug = await ensureUniqueSlug(
+        baseSlug,
+        isEdit ? initialProduct.id : null,
+      );
+
+      const payload = {
+        name,
+        slug: uniqueSlug,
+        price: formatNGN(price),
+        description,
+        category_id: categoryId || null,
+        featured,
+        active: true,
+      };
+
+      const res = isEdit
+        ? await supabase
+            .from("products")
+            .update(payload)
+            .eq("id", initialProduct.id)
+            .select("id")
+            .single()
+        : await supabase.from("products").insert(payload).select("id").single();
+
+      if (res.error) {
+        throw new Error(res.error.message);
+      }
+
+      const productId = res.data.id;
+
       if (pendingFiles.length > 0) {
         const uploadedRows = await uploadFilesForProduct(
           productId,
@@ -180,6 +222,7 @@ export default function ProductForm({
             URL.revokeObjectURL(item.previewUrl);
           } catch {}
         });
+
         setPendingFiles([]);
       }
 
@@ -191,7 +234,7 @@ export default function ProductForm({
       console.error("SAVE PRODUCT FLOW ERROR:", err);
       setBusy(false);
       setUploading(false);
-      setError(err?.message || "Product saved, but image upload failed.");
+      setError(err?.message || "Product could not be saved.");
     }
   }
 
