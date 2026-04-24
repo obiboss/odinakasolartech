@@ -150,22 +150,6 @@ async function getCategoryProducts(categoryId, childIds = []) {
   }));
 }
 
-async function getAllCategorySlugs() {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from("categories")
-    .select("slug")
-    .not("slug", "is", null);
-
-  if (error) {
-    console.log("SUPABASE ERROR (category slugs):", error);
-    return [];
-  }
-
-  return data || [];
-}
-
 function buildMeta(categoryName, productCount) {
   return {
     title: `${categoryName} in Nigeria | ${BRAND_NAME}`,
@@ -175,14 +159,6 @@ function buildMeta(categoryName, productCount) {
 
 function buildCategoryUrl(slug) {
   return `${SITE_URL}/shop/category/${slug}`;
-}
-
-export async function generateStaticParams() {
-  const categories = await getAllCategorySlugs();
-
-  return categories.map((category) => ({
-    slug: category.slug,
-  }));
 }
 
 export async function generateMetadata({ params }) {
