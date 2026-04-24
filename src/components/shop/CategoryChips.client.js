@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 function cx(...a) {
@@ -9,69 +9,53 @@ function cx(...a) {
 }
 
 export default function CategoryChips({ categories = [] }) {
+  const pathname = usePathname();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
-  const currentCat = searchParams.get("cat") || "all";
+  const isAllActive = pathname === "/shop";
 
-  function changeCategory(id) {
-    if (id === "all") {
-      router.push("/shop");
-      return;
-    }
-
-    router.push(`/shop?cat=${id}`);
-  }
-
-  /*
-  Prefetch BOTH:
-  - filter routes (UX)
-  - landing pages (SEO navigation speed)
-  */
   useEffect(() => {
-    categories.forEach((c) => {
-      if (c.slug) {
-        router.prefetch(`/shop/category/${c.slug}`);
+    router.prefetch("/shop");
+
+    categories.forEach((category) => {
+      if (category?.slug) {
+        router.prefetch(`/shop/category/${category.slug}`);
       }
-      router.prefetch(`/shop?cat=${c.id}`);
     });
   }, [categories, router]);
 
   return (
     <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-      {/* ALL BUTTON */}
-      <button
-        onClick={() => changeCategory("all")}
+      <Link
+        href="/shop"
         className={cx(
-          "cursor-pointer shrink-0 rounded-2xl px-4 py-2 text-sm font-semibold border border-slate-200 transition",
-          currentCat === "all"
+          "cursor-pointer shrink-0 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold transition",
+          isAllActive
             ? "bg-amber-500 text-slate-900"
             : "bg-white text-slate-700 hover:bg-slate-50",
         )}
       >
         All
-      </button>
+      </Link>
 
-      {categories.map((c) => {
-        const isActive = currentCat === c.id;
+      {categories.map((category) => {
+        if (!category?.slug) return null;
 
-        /*
-        IMPORTANT:
-        - Use Link for SEO (crawlable)
-        - Keep styling identical
-        */
+        const href = `/shop/category/${category.slug}`;
+        const isActive = pathname === href;
+
         return (
           <Link
-            key={c.id}
-            href={`/shop/category/${c.slug}`}
+            key={category.id}
+            href={href}
             className={cx(
-              "cursor-pointer shrink-0 rounded-2xl px-4 py-2 text-sm font-semibold border border-slate-200 transition",
+              "cursor-pointer shrink-0 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold transition",
               isActive
                 ? "bg-amber-500 text-slate-900"
                 : "bg-white text-slate-700 hover:bg-slate-50",
             )}
           >
-            {c.name}
+            {category.name}
           </Link>
         );
       })}

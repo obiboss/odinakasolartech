@@ -6,11 +6,24 @@ import Container from "@/components/ui/Container";
 import ShopClient from "@/components/shop/ShopClient.client";
 
 export const metadata = {
-  title: "Shop — Odinaka Solar Tech",
+  title: "Shop Solar Products in Nigeria — Odinaka Solar Tech",
   description:
-    "Shop solar panels, inverters, batteries, charge controllers, cables, breakers and accessories in Nigeria.",
+    "Shop solar panels, inverters, lithium batteries, charge controllers, cables, breakers and solar accessories in Nigeria.",
   alternates: {
-    canonical: "/shop",
+    canonical: "https://www.odinakachukwusolartech.com/shop",
+  },
+  openGraph: {
+    title: "Shop Solar Products in Nigeria — Odinaka Solar Tech",
+    description:
+      "Shop solar panels, inverters, lithium batteries, charge controllers, cables, breakers and solar accessories in Nigeria.",
+    url: "https://www.odinakachukwusolartech.com/shop",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Shop Solar Products in Nigeria — Odinaka Solar Tech",
+    description:
+      "Shop solar panels, inverters, lithium batteries, charge controllers, cables, breakers and solar accessories in Nigeria.",
   },
 };
 

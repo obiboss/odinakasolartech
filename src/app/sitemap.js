@@ -18,8 +18,9 @@ export default async function sitemap() {
 
   const { data: categories, error: categoriesError } = await supabase
     .from("categories")
-    .select("id, slug")
-    .not("slug", "is", null);
+    .select("slug")
+    .not("slug", "is", null)
+    .order("name", { ascending: true });
 
   if (categoriesError) {
     console.log("SUPABASE ERROR (sitemap categories):", categoriesError);
@@ -49,10 +50,10 @@ export default async function sitemap() {
   ];
 
   const categoryRoutes = (categories || []).map((category) => ({
-    url: `${SITE_URL}/shop?cat=${category.id}`,
+    url: `${SITE_URL}/shop/category/${category.slug}`,
     lastModified: now,
     changeFrequency: "weekly",
-    priority: 0.75,
+    priority: 0.8,
   }));
 
   const productRoutes = (products || []).map((product) => ({
