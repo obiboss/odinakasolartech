@@ -107,15 +107,17 @@ export default function HomeHero({ store, wa }) {
                 Shop by category
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3">
-                {store.categories.map((c) => (
-                  <a
-                    key={c.id}
-                    href={`/shop?cat=${c.id}`}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition"
-                  >
-                    {c.name}
-                  </a>
-                ))}
+                {store.categories
+                  .filter((c) => Boolean(c.slug))
+                  .map((c) => (
+                    <a
+                      key={c.id}
+                      href={`/shop/category/${c.slug}`}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition"
+                    >
+                      {c.name}
+                    </a>
+                  ))}
               </div>
 
               <div className="mt-6 text-sm text-slate-600">
