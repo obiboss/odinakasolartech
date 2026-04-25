@@ -49,6 +49,31 @@ function getAverageRating(reviews) {
   return Number((total / reviews.length).toFixed(1));
 }
 
+function splitProductDescription(description) {
+  const text = String(description || "").trim();
+
+  if (!text) {
+    return {
+      packageSummary: "",
+      overview: "",
+    };
+  }
+
+  const overviewMatch = text.match(/Power Solution Overview/i);
+
+  if (!overviewMatch || typeof overviewMatch.index !== "number") {
+    return {
+      packageSummary: "",
+      overview: text,
+    };
+  }
+
+  return {
+    packageSummary: text.slice(0, overviewMatch.index).trim(),
+    overview: text.slice(overviewMatch.index).trim(),
+  };
+}
+
 const getProductBySlug = cache(async (slug) => {
   const supabase = await createClient();
 
@@ -257,6 +282,7 @@ export default async function ProductPage({ params }) {
   const primaryImage = getPrimaryImage(product);
   const approvedReviews = getApprovedReviews(product);
   const averageRating = getAverageRating(approvedReviews);
+  const descriptionParts = splitProductDescription(product.description);
 
   const wa = whatsappLink({
     phone: store.business.whatsapp,
@@ -407,11 +433,27 @@ export default async function ProductPage({ params }) {
         </ol>
       </nav>
 
-      <div className="grid gap-6 lg:grid-cols-12">
-        <div className="lg:col-span-7">
+      <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
+        <div className="space-y-4 lg:col-span-7">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <ProductGallery images={product.images || []} name={product.name} />
           </div>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="text-xl font-bold text-slate-900">
+              Product Overview
+            </h2>
+
+            {descriptionParts.overview ? (
+              <div className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700 sm:text-base">
+                {descriptionParts.overview}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm leading-7 text-slate-600">
+                Product overview will be added by admin.
+              </p>
+            )}
+          </section>
         </div>
 
         <div className="space-y-4 lg:col-span-5">
@@ -430,9 +472,11 @@ export default async function ProductPage({ params }) {
               </p>
             ) : null}
 
-            <div className="mt-4 text-sm leading-relaxed whitespace-pre-line text-slate-700">
-              {product.description || "No description yet."}
-            </div>
+            {descriptionParts.packageSummary ? (
+              <div className="mt-5 whitespace-pre-line text-sm leading-7 text-slate-700">
+                {descriptionParts.packageSummary}
+              </div>
+            ) : null}
 
             {primaryImage ? (
               <link rel="preload" as="image" href={primaryImage} />
