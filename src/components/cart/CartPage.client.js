@@ -9,6 +9,11 @@ import { whatsappLink } from "@/lib/whatsapp";
 import { supabase } from "@/lib/supabase/client";
 import { createOrder } from "@/lib/orders/createOrder";
 import { createOrderConversation } from "@/lib/chat/createOrderConversation";
+import {
+  trackBankTransferSubmitted,
+  trackInitiateCheckout,
+  trackPurchase,
+} from "@/lib/analytics/meta-pixel";
 
 const HIGH_VALUE_THRESHOLD = 3_000_000;
 
@@ -97,6 +102,15 @@ export default function CartPage({ store }) {
       setPlacingOrder(true);
       setPaymentSubmitted(false);
 
+      const contentIds = items.map((item) => item.id);
+
+      trackInitiateCheckout({
+        contentIds,
+        value: total,
+        numItems: itemCount,
+        currency: "NGN",
+      });
+
       const session = await ensureSession();
       const userId = session?.user?.id;
 
@@ -120,6 +134,14 @@ export default function CartPage({ store }) {
       const convo = await createOrderConversation({
         userId,
         order,
+      });
+
+      trackPurchase({
+        orderId: order.id,
+        contentIds,
+        value: Number(order.total_amount || total || 0),
+        numItems: itemCount,
+        currency: "NGN",
       });
 
       setPlacedOrder({
@@ -155,6 +177,12 @@ export default function CartPage({ store }) {
       });
 
       if (error) throw error;
+
+      trackBankTransferSubmitted({
+        orderId: placedOrder.id,
+        value: placedOrder.depositAmount,
+        currency: "NGN",
+      });
 
       setPaymentSubmitted(true);
     } catch (err) {

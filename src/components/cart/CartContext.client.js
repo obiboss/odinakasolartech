@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { trackAddToCart } from "@/lib/analytics/meta-pixel";
 
 const STORAGE_KEY = "odinaka-solar-cart";
 
@@ -15,9 +16,11 @@ const CartContext = createContext(null);
 
 function loadCart() {
   if (typeof window === "undefined") return [];
+
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
+
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
@@ -27,10 +30,11 @@ function loadCart() {
 
 function saveCart(items) {
   if (typeof window === "undefined") return;
+
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   } catch {
-    // Ignore storage errors (private mode, quota, etc.)
+    // Ignore storage errors.
   }
 }
 
@@ -47,16 +51,26 @@ export function CartProvider({ children }) {
   }, [items]);
 
   const addItem = useCallback((item, quantity = 1) => {
+    const safeQuantity = Math.max(1, Number(quantity || 1));
+
+    trackAddToCart({
+      contentId: item.id,
+      contentName: item.name,
+      value: Number(item.price || 0) * safeQuantity,
+      quantity: safeQuantity,
+      currency: item.currency || "NGN",
+    });
+
     setItems((prev) => {
       const existing = prev.find((x) => x.id === item.id);
 
       if (existing) {
         return prev.map((x) =>
-          x.id === item.id ? { ...x, quantity: x.quantity + quantity } : x,
+          x.id === item.id ? { ...x, quantity: x.quantity + safeQuantity } : x,
         );
       }
 
-      return [...prev, { ...item, quantity }];
+      return [...prev, { ...item, quantity: safeQuantity }];
     });
   }, []);
 
@@ -140,8 +154,10 @@ export function CartProvider({ children }) {
 
 export function useCart() {
   const ctx = useContext(CartContext);
+
   if (!ctx) {
     throw new Error("useCart must be used within a CartProvider");
   }
+
   return ctx;
 }

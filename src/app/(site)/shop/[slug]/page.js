@@ -10,6 +10,7 @@ import ProductReviews from "@/components/shop/ProductReviews.server";
 import RelatedProducts from "@/components/shop/RelatedProducts.server";
 import FeaturedCarousel from "@/components/shop/FeaturedCarousel.client";
 import JsonLd from "@/components/seo/JsonLd";
+import ProductViewTracker from "@/components/analytics/ProductViewTracker.client";
 
 export const revalidate = 300;
 
@@ -414,6 +415,15 @@ export default async function ProductPage({ params }) {
       <JsonLd data={productJsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
       <JsonLd data={faqJsonLd} />
+
+      <ProductViewTracker
+        product={{
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          currency: product.currency || "NGN",
+        }}
+      />
 
       <nav className="mb-5 text-sm text-slate-500" aria-label="Breadcrumb">
         <ol className="flex flex-wrap items-center gap-2">
