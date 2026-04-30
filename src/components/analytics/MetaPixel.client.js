@@ -4,7 +4,6 @@ import Script from "next/script";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef } from "react";
 import { trackPageView } from "@/lib/analytics/meta-pixel";
-import Image from "next/image";
 
 const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 
@@ -52,7 +51,7 @@ export default function MetaPixel() {
       />
 
       <noscript>
-        <Image
+        <img
           height="1"
           width="1"
           style={{ display: "none" }}
