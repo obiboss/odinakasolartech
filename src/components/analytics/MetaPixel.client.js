@@ -50,16 +50,6 @@ export default function MetaPixel() {
         }}
       />
 
-      <noscript>
-        <img
-          height="1"
-          width="1"
-          style={{ display: "none" }}
-          src={`https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1`}
-          alt=""
-        />
-      </noscript>
-
       <Suspense fallback={null}>
         <MetaPixelPageViewTracker />
       </Suspense>
