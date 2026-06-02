@@ -1,4 +1,5 @@
 import "./globals.css";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import ThemeProvider from "@/components/providers/ThemeProvider";
 import { CartProvider } from "@/components/cart/CartContext.client";
 import { GlobalLoaderProvider } from "@/components/ui/GlobalLoaderProvider.client";
@@ -18,16 +19,21 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
+  const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
         <MetaPixel />
+
         <ThemeProvider>
           <GlobalLoaderProvider>
             <CartProvider>{children}</CartProvider>
           </GlobalLoaderProvider>
         </ThemeProvider>
       </body>
+
+      {gaId ? <GoogleAnalytics gaId={gaId} /> : null}
     </html>
   );
 }
