@@ -11,6 +11,7 @@ import RelatedProducts from "@/components/shop/RelatedProducts.server";
 import FeaturedCarousel from "@/components/shop/FeaturedCarousel.client";
 import JsonLd from "@/components/seo/JsonLd";
 import ProductViewTracker from "@/components/analytics/ProductViewTracker.client";
+import { normalizeProductRecord } from "@/lib/supabase/storage";
 
 export const revalidate = 300;
 
@@ -108,8 +109,10 @@ const getProductBySlug = cache(async (slug) => {
       ),
       reviews:reviews!left (
         id,
+        display_name,
         rating,
         content,
+        image_url,
         created_at,
         status
       )
@@ -117,6 +120,7 @@ const getProductBySlug = cache(async (slug) => {
     )
     .eq("slug", slug)
     .eq("active", true)
+    .eq("reviews.status", "approved")
     .order("sort_order", { foreignTable: "product_images", ascending: true })
     .order("created_at", { foreignTable: "reviews", ascending: false })
     .maybeSingle();
@@ -205,7 +209,7 @@ async function getFeaturedProducts(productId) {
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const product = await getProductBySlug(slug);
+  const product = normalizeProductRecord(await getProductBySlug(slug));
 
   if (!product) {
     return {
@@ -269,13 +273,18 @@ export async function generateMetadata({ params }) {
 export default async function ProductPage({ params }) {
   const { slug } = await params;
 
-  const product = await getProductBySlug(slug);
+  const product = normalizeProductRecord(await getProductBySlug(slug));
   if (!product) return notFound();
 
   const [relatedProducts, featured] = await Promise.all([
     getRelatedProducts(product.category_id, product.id),
     getFeaturedProducts(product.id),
   ]);
+
+  const normalizedRelatedProducts = (relatedProducts || []).map(
+    normalizeProductRecord,
+  );
+  const normalizedFeatured = (featured || []).map(normalizeProductRecord);
 
   const store = getStore();
 
@@ -585,10 +594,10 @@ export default async function ProductPage({ params }) {
       </section>
 
       <div className="mt-10">
-        <RelatedProducts products={relatedProducts} />
+        <RelatedProducts products={normalizedRelatedProducts} />
       </div>
 
-      <FeaturedCarousel title="Special Offers" products={featured} />
+      <FeaturedCarousel title="Special Offers" products={normalizedFeatured} />
     </Container>
   );
 }

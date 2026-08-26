@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
+import { getStoragePublicUrl } from "@/lib/supabase/storage";
 
 function slugify(str) {
   return String(str || "")
@@ -106,8 +107,7 @@ export default function ProductForm({
         throw new Error(up.error.message);
       }
 
-      const pub = supabase.storage.from("product-images").getPublicUrl(path);
-      const image_url = pub?.data?.publicUrl;
+      const image_url = getStoragePublicUrl(supabase, "product-images", path);
 
       if (!image_url) {
         throw new Error(

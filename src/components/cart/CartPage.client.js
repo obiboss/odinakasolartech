@@ -18,12 +18,20 @@ import {
 const HIGH_VALUE_THRESHOLD = 3_000_000;
 
 async function ensureSession() {
+  const startSession = performance.now();
   const { data, error } = await supabase.auth.getSession();
+  console.log(
+    `[SUPABASE ${Math.round(performance.now() - startSession)}ms] auth.getSession`,
+  );
   if (error) throw error;
   if (data?.session) return data.session;
 
+  const startAnon = performance.now();
   const { data: anon, error: anonError } =
     await supabase.auth.signInAnonymously();
+  console.log(
+    `[SUPABASE ${Math.round(performance.now() - startAnon)}ms] auth.signInAnonymously`,
+  );
 
   if (anonError) throw anonError;
   return anon.session;
@@ -169,12 +177,16 @@ export default function CartPage({ store }) {
     try {
       setPaymentSubmitBusy(true);
 
+      const start = performance.now();
       const { error } = await supabase.from("messages").insert({
         conversation_id: placedOrder.conversationId,
         sender: "customer",
         content:
           "✅ I have made the payment. Please confirm. I will upload proof shortly.",
       });
+      console.log(
+        `[SUPABASE ${Math.round(performance.now() - start)}ms] messages.insert`,
+      );
 
       if (error) throw error;
 

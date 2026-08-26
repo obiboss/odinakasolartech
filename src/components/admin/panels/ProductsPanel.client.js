@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase/client";
+import { getStoragePublicUrl } from "@/lib/supabase/storage";
 
 function cx(...a) {
   return a.filter(Boolean).join(" ");
@@ -207,8 +208,7 @@ export default function ProductsPanel() {
         throw new Error(up.error.message);
       }
 
-      const pub = supabase.storage.from("product-images").getPublicUrl(path);
-      const image_url = pub?.data?.publicUrl;
+      const image_url = getStoragePublicUrl(supabase, "product-images", path);
 
       if (!image_url) {
         throw new Error(

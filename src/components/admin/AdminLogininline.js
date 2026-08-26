@@ -19,10 +19,14 @@ export default function AdminLoginInline({ errorText = "" }) {
     setBusy(true);
     setError("");
 
+    const start = performance.now();
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+    console.log(
+      `[SUPABASE ${Math.round(performance.now() - start)}ms] auth.signInWithPassword`,
+    );
 
     setBusy(false);
     if (error) return setError(error.message);

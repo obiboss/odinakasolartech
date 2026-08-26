@@ -1,4 +1,5 @@
 // src/components/shop/ProductReviews.server.js
+import Image from "next/image";
 import ReviewForm from "@/components/shop/ReviewForm.client";
 
 export default async function ProductReviews({ productId, reviews = [] }) {
@@ -13,7 +14,7 @@ export default async function ProductReviews({ productId, reviews = [] }) {
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold text-slate-900">
-                  Customer
+                  {r.display_name || "Customer"}
                 </div>
                 <div className="text-xs text-slate-500">
                   {new Date(r.created_at).toLocaleDateString()}
@@ -27,6 +28,16 @@ export default async function ProductReviews({ productId, reviews = [] }) {
               <div className="mt-2 text-sm text-slate-700 whitespace-pre-line">
                 {r.content}
               </div>
+
+              {r.image_url ? (
+                <Image
+                  src={r.image_url}
+                  alt={`${r.display_name || "Customer"}'s review`}
+                  width={256}
+                  height={256}
+                  className="mt-3 max-h-64 rounded-xl border border-slate-200 object-cover"
+                />
+              ) : null}
             </div>
           ))}
         </div>

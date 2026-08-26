@@ -4,6 +4,7 @@ import Container from "@/components/ui/Container";
 import ProductCard from "@/components/shop/ProductCard.client";
 import JsonLd from "@/components/seo/JsonLd";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeProductRecord } from "@/lib/supabase/storage";
 
 export const revalidate = 300;
 
@@ -142,12 +143,14 @@ async function getCategoryProducts(categoryId, childIds = []) {
     return [];
   }
 
-  return (data || []).map((product) => ({
-    ...product,
-    images: [...(product.images || [])].sort(
-      (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0),
-    ),
-  }));
+  return (data || [])
+    .map((product) => ({
+      ...product,
+      images: [...(product.images || [])].sort(
+        (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0),
+      ),
+    }))
+    .map(normalizeProductRecord);
 }
 
 function buildMeta(categoryName, productCount) {

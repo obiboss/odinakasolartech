@@ -4,6 +4,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import Container from "@/components/ui/Container";
 import ShopClient from "@/components/shop/ShopClient.client";
+import { normalizeProductRecord } from "@/lib/supabase/storage";
 
 export const metadata = {
   title: "Shop Solar Products in Nigeria — Odinaka Solar Tech",
@@ -132,11 +133,13 @@ export default async function ShopPage({ searchParams }) {
     console.log("SUPABASE ERROR (products):", error);
   }
 
+  const normalizedProducts = (products || []).map(normalizeProductRecord);
+
   return (
     <Container className="py-8 sm:py-10">
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <ShopClient
-          initialProducts={products || []}
+          initialProducts={normalizedProducts}
           categories={categories || []}
           totalProducts={count || 0}
           page={page}

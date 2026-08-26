@@ -1,0 +1,13 @@
+﻿{
+  "active": true,
+  "items": [
+    {
+      "id": "launch-promo",
+      "title": "Launch Promo",
+      "subtitle": "Bundle panels + inverter + battery — get free basic accessories (limited).",
+      "badge": "PROMO",
+      "starts": "2026-03-01",
+      "ends": "2026-03-31"
+    }
+  ]
+}

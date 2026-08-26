@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getHomepageData } from "@/lib/homepage-data.server";
 import HomeHero from "@/components/shop/HomeHero.server";
 import PromoStrip from "@/components/shop/PromoStrip";
 import FeaturedProducts from "@/components/shop/FeaturedProducts.server";
@@ -6,6 +6,7 @@ import FeaturedCarousel from "@/components/shop/FeaturedCarousel.client";
 import ProductInfo from "@/components/shop/ProductInfo.server";
 import Testimonials from "@/components/home/Testimonials.client";
 import TrustSection from "@/components/home/TrustSection.server";
+import { normalizeProductRecord } from "@/lib/supabase/storage";
 
 export const metadata = {
   title: "Buy Solar Products in Nigeria — Odinaka Solar Tech",
@@ -16,36 +17,32 @@ export const metadata = {
 export const revalidate = 300;
 
 export default async function HomePage() {
-  const supabase = await createClient();
+  const {
+    specialOffers,
+    featuredProducts,
+    latestProducts,
+    featuredReviews,
+    approvedReviews,
+  } = await getHomepageData();
 
-  const { data: specialOffers, error } = await supabase
-    .from("products")
-    .select(
-      `
-      id,
-      name,
-      slug,
-      price,
-      currency,
-      short_description,
-      in_stock,
-      show_in_special_offers,
-      images:product_images(
-        image_url,
-        sort_order
-      )
-    `,
-    )
-    .eq("active", true)
-    .eq("show_on_homepage", true)
-    .eq("show_in_special_offers", true)
-    .order("sort_order", { ascending: true })
-    .order("sort_order", { foreignTable: "product_images", ascending: true })
-    .limit(10);
-
-  if (error) {
-    console.log("SUPABASE ERROR (special offers):", error);
-  }
+  const normalizedSpecialOffers = (specialOffers || []).map(
+    normalizeProductRecord,
+  );
+  const normalizedFeaturedProducts = (featuredProducts || []).map(
+    normalizeProductRecord,
+  );
+  const normalizedLatestProducts = (latestProducts || []).map(
+    normalizeProductRecord,
+  );
+  const featuredReviewIds = new Set(
+    (featuredReviews || []).map((review) => review.id),
+  );
+  const testimonialReviews = [
+    ...(featuredReviews || []),
+    ...(approvedReviews || []).filter(
+      (review) => !featuredReviewIds.has(review.id),
+    ),
+  ].slice(0, 3);
 
   return (
     <>
@@ -53,13 +50,16 @@ export default async function HomePage() {
 
       <HomeHero />
 
-      <ProductInfo />
+      <ProductInfo products={normalizedLatestProducts} />
 
-      <FeaturedProducts />
+      <FeaturedProducts products={normalizedFeaturedProducts} />
 
-      <FeaturedCarousel title="Special Offers" products={specialOffers || []} />
+      <FeaturedCarousel
+        title="Special Offers"
+        products={normalizedSpecialOffers}
+      />
 
-      <Testimonials />
+      <Testimonials reviews={testimonialReviews} />
 
       <TrustSection />
     </>

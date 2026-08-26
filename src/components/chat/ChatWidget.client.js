@@ -50,14 +50,14 @@ async function ensureSession() {
 async function getOrCreateConversation(userId) {
   const { data: existing, error: selErr } = await supabase
     .from("conversations")
-    .select("id,status,created_at")
+    .select("id,status,created_at,customer_name,customer_phone,customer_email")
     .eq("customer_id", userId)
     .eq("status", "open")
     .order("created_at", { ascending: false })
     .limit(1);
 
   if (selErr) throw selErr;
-  if (existing?.[0]?.id) return existing[0].id;
+  if (existing?.[0]?.id) return existing[0];
 
   const { data: created, error: insErr } = await supabase
     .from("conversations")
@@ -66,11 +66,11 @@ async function getOrCreateConversation(userId) {
       status: "open",
       order_id: null,
     })
-    .select("id")
+    .select("id,customer_name,customer_phone,customer_email")
     .single();
 
   if (insErr) throw insErr;
-  return created.id;
+  return created;
 }
 
 async function fetchMessages(conversationId) {
@@ -129,6 +129,14 @@ export default function ChatWidget() {
   const [order, setOrder] = useState(null);
   const [paymentSettings, setPaymentSettings] = useState(null);
 
+  const [customerDetails, setCustomerDetails] = useState({
+    name: "",
+    phone: "",
+    email: "",
+  });
+
+  const [showCustomerForm, setShowCustomerForm] = useState(false);
+
   const bottomRef = useRef(null);
   const dbChannelRef = useRef(null);
   const metaChannelRef = useRef(null);
@@ -147,8 +155,12 @@ export default function ChatWidget() {
   const buttonRef = useRef(null);
 
   const canSend = useMemo(
-    () => !busy && !!conversationId && (text.trim().length > 0 || !!file),
-    [busy, conversationId, text, file],
+    () =>
+      !busy &&
+      !!conversationId &&
+      !showCustomerForm &&
+      (text.trim().length > 0 || !!file),
+    [busy, conversationId, showCustomerForm, text, file],
   );
 
   const playNotification = useCallback(() => {
@@ -282,18 +294,31 @@ export default function ChatWidget() {
 
         setCustomerUserId(session.user.id);
 
-        const cid = await getOrCreateConversation(session.user.id);
+        const conversation = await getOrCreateConversation(session.user.id);
+
         if (!alive) return;
 
-        setConversationId(cid);
+        setConversationId(conversation.id);
 
-        const initial = await fetchMessages(cid);
+        const hasCustomerInfo =
+          conversation.customer_name &&
+          conversation.customer_name.trim() !== "";
+
+        setCustomerDetails({
+          name: conversation.customer_name || "",
+          phone: conversation.customer_phone || "",
+          email: conversation.customer_email || "",
+        });
+
+        setShowCustomerForm(!hasCustomerInfo);
+
+        const initial = await fetchMessages(conversation.id);
         if (!alive) return;
 
         setMessages(initial);
         hydratedRef.current = true;
 
-        await markDeliveredAsCustomer(cid);
+        await markDeliveredAsCustomer(conversation.id);
       } catch (e) {
         if (alive) setBootError(e?.message || "Chat failed to start.");
       } finally {
@@ -642,8 +667,46 @@ export default function ChatWidget() {
     }
   }
 
+  async function saveCustomerDetails() {
+    if (!conversationId) return false;
+
+    if (!customerDetails.name.trim()) {
+      alert("Please enter your name.");
+      return false;
+    }
+
+    try {
+      setBusy(true);
+
+      const { error } = await supabase
+        .from("conversations")
+        .update({
+          customer_name: customerDetails.name.trim(),
+          customer_phone: customerDetails.phone.trim() || null,
+          customer_email: customerDetails.email.trim() || null,
+        })
+        .eq("id", conversationId);
+
+      if (error) throw error;
+
+      setShowCustomerForm(false);
+      return true;
+    } catch (err) {
+      alert(err.message || "Unable to save your details.");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function sendMessage(e) {
     e.preventDefault();
+
+    if (showCustomerForm) {
+      const ok = await saveCustomerDetails();
+      if (!ok) return;
+    }
+
     if (!canSend) return;
 
     setBusy(true);
@@ -653,19 +716,21 @@ export default function ChatWidget() {
       let attachment_type = null;
 
       if (file) {
-        const uploaded = await uploadChatFile({ conversationId, file });
+        const uploaded = await uploadChatFile({
+          conversationId,
+          file,
+        });
+
         attachment_url = `${uploaded.bucket}/${uploaded.path}`;
         attachment_type = file.type || "application/octet-stream";
       }
-
-      const content = text.trim();
 
       const { data, error } = await supabase
         .from("messages")
         .insert({
           conversation_id: conversationId,
           sender: "customer",
-          content: content || "",
+          content: text.trim(),
           attachment_url,
           attachment_type,
         })
@@ -677,6 +742,7 @@ export default function ChatWidget() {
       if (error) throw error;
 
       setMessages((prev) => upsertMessages(prev, data));
+
       setText("");
       setFile(null);
 
@@ -684,8 +750,8 @@ export default function ChatWidget() {
         isTypingRef.current = false;
         await sendTyping(false);
       }
-    } catch (e2) {
-      alert(e2?.message || "Failed to send.");
+    } catch (err) {
+      alert(err.message || "Failed to send message.");
     } finally {
       setBusy(false);
     }
@@ -721,7 +787,10 @@ export default function ChatWidget() {
         <div className="fixed bottom-24 right-5 z-[80] w-[92vw] max-w-[420px] overflow-hidden rounded-2xl border border-slate-200 bg-white/90 text-slate-900 shadow-[0_18px_60px_rgba(0,0,0,0.15)]">
           <div className="flex items-center justify-between border-b border-slate-200 bg-slate-100 px-4 py-3">
             <div>
-              <div className="text-sm font-bold">Support Chat</div>
+              <div className="text-sm font-bold">
+                Support Chat
+                {customerDetails.name ? ` • ${customerDetails.name}` : ""}
+              </div>
               <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
                 <span
                   className={cx(
@@ -805,9 +874,72 @@ export default function ChatWidget() {
               </div>
             ) : null}
 
-            {!bootError && messages.length === 0 ? (
+            {!bootError && !showCustomerForm && messages.length === 0 ? (
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                Ask a question or upload payment proof.
+                Ask a question, upload payment proof, or send us any enquiry.
+              </div>
+            ) : null}
+
+            {showCustomerForm ? (
+              <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <div className="text-sm font-semibold text-slate-900">
+                  Before we start
+                </div>
+
+                <p className="mt-1 text-xs text-slate-600">
+                  Please tell us who you are so our support team can follow up
+                  with you.
+                </p>
+
+                <div className="mt-3 space-y-3">
+                  <input
+                    type="text"
+                    placeholder="Your full name *"
+                    value={customerDetails.name}
+                    onChange={(e) =>
+                      setCustomerDetails((prev) => ({
+                        ...prev,
+                        name: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                  />
+
+                  <input
+                    type="tel"
+                    placeholder="Phone number (optional)"
+                    value={customerDetails.phone}
+                    onChange={(e) =>
+                      setCustomerDetails((prev) => ({
+                        ...prev,
+                        phone: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                  />
+
+                  <input
+                    type="email"
+                    placeholder="Email address (optional)"
+                    value={customerDetails.email}
+                    onChange={(e) =>
+                      setCustomerDetails((prev) => ({
+                        ...prev,
+                        email: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={saveCustomerDetails}
+                    disabled={busy}
+                    className="w-full rounded-xl bg-yellow-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
+                  >
+                    {busy ? "Saving..." : "Continue to Chat"}
+                  </button>
+                </div>
               </div>
             ) : null}
 
@@ -888,10 +1020,17 @@ export default function ChatWidget() {
             className="border-t border-slate-200 bg-slate-50 p-3"
           >
             <div className="flex gap-2">
-              <label className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold hover:bg-slate-100">
+              <label
+                className={`inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold ${
+                  showCustomerForm
+                    ? "cursor-not-allowed opacity-50"
+                    : "cursor-pointer hover:bg-slate-100"
+                }`}
+              >
                 File
                 <input
                   type="file"
+                  disabled={showCustomerForm}
                   className="hidden"
                   accept="image/*,application/pdf"
                   onChange={(e) => setFile(e.target.files?.[0] || null)}
@@ -900,21 +1039,26 @@ export default function ChatWidget() {
 
               <input
                 value={text}
+                disabled={showCustomerForm}
                 onChange={(e) => handleTextChange(e.target.value)}
-                placeholder="Type your message..."
-                className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
+                placeholder={
+                  showCustomerForm
+                    ? "Complete your details above first"
+                    : "Type your message..."
+                }
+                className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none disabled:bg-slate-100 disabled:text-slate-400"
               />
 
               <button
                 type="submit"
-                disabled={!canSend}
+                disabled={!canSend || showCustomerForm}
                 className="rounded-xl bg-yellow-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
                 {busy ? "..." : "Send"}
               </button>
             </div>
 
-            {file ? (
+            {!showCustomerForm && file ? (
               <div className="mt-2 text-xs text-slate-500">
                 Selected: {file.name}
                 <button

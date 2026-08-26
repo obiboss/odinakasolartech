@@ -675,6 +675,12 @@ export default function ChatPanel() {
               {convos.map((c) => {
                 const isActive = c.id === activeId;
                 const unread = Number(c.unread_count || 0);
+                const customerName =
+                  c.customer_name?.trim() ||
+                  c.customer_email?.trim() ||
+                  c.customer_phone?.trim() ||
+                  "Customer";
+                const customerPhone = c.customer_phone?.trim();
 
                 return (
                   <button
@@ -691,11 +697,13 @@ export default function ChatPanel() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-semibold text-slate-900">
-                          {c.customer_name || c.customer_phone || "Customer"}
+                          {customerName}
                         </div>
-                        <div className="mt-1 truncate text-xs text-slate-500">
-                          {c.customer_phone || "No phone"}
-                        </div>
+                        {customerPhone ? (
+                          <div className="mt-1 truncate text-xs text-slate-500">
+                            {customerPhone}
+                          </div>
+                        ) : null}
                       </div>
 
                       <div className="flex flex-col items-end gap-1">
@@ -791,12 +799,18 @@ export default function ChatPanel() {
                 <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-bold text-slate-900">
-                      {active.customer_name ||
-                        active.customer_phone ||
+                      {active.customer_name?.trim() ||
+                        active.customer_email?.trim() ||
+                        active.customer_phone?.trim() ||
                         "Customer"}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                      <span>{active.customer_phone || "No phone"}</span>
+                      {active.customer_phone?.trim() ? (
+                        <span>{active.customer_phone.trim()}</span>
+                      ) : null}
+                      {active.customer_email?.trim() ? (
+                        <span>{active.customer_email.trim()}</span>
+                      ) : null}
                       <span
                         className={cx(
                           "rounded-full px-2 py-0.5",

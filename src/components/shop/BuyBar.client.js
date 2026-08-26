@@ -10,13 +10,21 @@ import { createOrderConversation } from "@/lib/chat/createOrderConversation";
 const HIGH_VALUE_THRESHOLD = 3_000_000;
 
 async function ensureSession() {
+  const startSession = performance.now();
   const { data, error } = await supabase.auth.getSession();
+  console.log(
+    `[SUPABASE ${Math.round(performance.now() - startSession)}ms] auth.getSession`,
+  );
 
   if (error) throw error;
   if (data?.session) return data.session;
 
+  const startAnon = performance.now();
   const { data: anon, error: anonError } =
     await supabase.auth.signInAnonymously();
+  console.log(
+    `[SUPABASE ${Math.round(performance.now() - startAnon)}ms] auth.signInAnonymously`,
+  );
 
   if (anonError) throw anonError;
 

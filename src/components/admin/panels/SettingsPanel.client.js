@@ -165,9 +165,13 @@ export default function SettingsPanel() {
     try {
       setPasswordBusy(true);
 
+      const start = performance.now();
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
+      console.log(
+        `[SUPABASE ${Math.round(performance.now() - start)}ms] auth.updateUser`,
+      );
 
       if (error) throw error;
 

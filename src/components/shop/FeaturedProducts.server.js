@@ -3,31 +3,39 @@ import Link from "next/link";
 import Container from "@/components/ui/Container";
 import ProductGrid from "@/components/shop/ProductGrid.client";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeProductRecord } from "@/lib/supabase/storage";
 
-export default async function FeaturedProducts() {
-  const supabase = await createClient();
+export default async function FeaturedProducts({ products: initialProducts }) {
+  let products = initialProducts;
 
-  const { data: products, error } = await supabase
-    .from("products")
-    .select(
-      `
-      id,
-      name,
-      slug,
-      price,
-      description,
-      featured,
-      active,
-      created_at,
-      images:product_images(id,image_url)
-    `,
-    )
-    .eq("active", true)
-    .eq("featured", true)
-    .order("created_at", { ascending: false })
-    .limit(12);
+  // Explicit parent data, including [], must not trigger a duplicate query.
+  if (products === undefined) {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("products")
+      .select(
+        `
+        id,
+        name,
+        slug,
+        price,
+        description,
+        featured,
+        active,
+        created_at,
+        images:product_images(id,image_url)
+      `,
+      )
+      .eq("active", true)
+      .eq("featured", true)
+      .order("created_at", { ascending: false })
+      .limit(12);
 
-  if (error) console.log("SUPABASE ERROR:", error);
+    if (error) console.log("SUPABASE ERROR:", error);
+    products = data || [];
+  }
+
+  const normalizedProducts = (products || []).map(normalizeProductRecord);
 
   return (
     <section className="border-t border-slate-200">
@@ -52,7 +60,7 @@ export default async function FeaturedProducts() {
         </div>
 
         <div className="mt-6">
-          <ProductGrid items={products || []} />
+          <ProductGrid items={normalizedProducts} />
         </div>
       </Container>
     </section>

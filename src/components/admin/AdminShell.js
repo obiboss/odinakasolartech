@@ -13,7 +13,11 @@ export default function AdminShell({ children, mode = "admin" }) {
   const canShowNav = mode === "admin";
 
   const signOut = async () => {
+    const start = performance.now();
     await supabase.auth.signOut();
+    console.log(
+      `[SUPABASE ${Math.round(performance.now() - start)}ms] auth.signOut`,
+    );
     window.location.href = "/admin";
   };
 

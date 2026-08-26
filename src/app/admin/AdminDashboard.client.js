@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import OverviewPanel from "@/components/admin/panels/OverviewPanel.client";
 import OrdersPanel from "@/components/admin/panels/OrdersPanel.client";
 import ProductsPanel from "@/components/admin/panels/ProductsPanel.client";
+import ReviewsPanel from "@/components/admin/panels/ReviewsPanel.client";
 import ChatPanel from "@/components/admin/panels/ChatPanel.client";
 import PromosPanel from "@/components/admin/panels/PromosPanel.client";
 import SettingsPanel from "@/components/admin/panels/SettingsPanel.client";
@@ -13,6 +14,7 @@ const TABS = [
   { key: "overview", label: "Overview" },
   { key: "orders", label: "Orders" },
   { key: "products", label: "Products" },
+  { key: "reviews", label: "Reviews" },
   { key: "chat", label: "Chat" },
   { key: "promos", label: "Promos" },
   { key: "settings", label: "Settings" },
@@ -31,6 +33,8 @@ export default function AdminDashboardClient() {
         return <OrdersPanel />;
       case "products":
         return <ProductsPanel />;
+      case "reviews":
+        return <ReviewsPanel />;
       case "chat":
         return <ChatPanel />;
       case "promos":

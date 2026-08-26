@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase/client";
 
 export async function createOrderConversation({ userId, order }) {
+  const startConvo = performance.now();
   const { data: convo, error: convoError } = await supabase
     .from("conversations")
     .insert({
@@ -10,6 +11,9 @@ export async function createOrderConversation({ userId, order }) {
     })
     .select()
     .single();
+  console.log(
+    `[SUPABASE ${Math.round(performance.now() - startConvo)}ms] conversations.insert`,
+  );
 
   if (convoError) throw convoError;
 
@@ -31,11 +35,15 @@ export async function createOrderConversation({ userId, order }) {
       : "Pay on delivery available",
   ].join("\n");
 
+  const startMessage = performance.now();
   const { error: messageError } = await supabase.from("messages").insert({
     conversation_id: convo.id,
     sender: "customer",
     content: message,
   });
+  console.log(
+    `[SUPABASE ${Math.round(performance.now() - startMessage)}ms] messages.insert`,
+  );
 
   if (messageError) throw messageError;
 

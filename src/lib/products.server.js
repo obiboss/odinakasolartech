@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { normalizeProductRecord } from "@/lib/supabase/storage";
 
 export async function getProductBySlug(slug) {
   const supabase = await createClient();
@@ -43,5 +44,5 @@ export async function getProductBySlug(slug) {
     throw error;
   }
 
-  return data;
+  return normalizeProductRecord(data);
 }
