@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase/client";
 import { getStoragePublicUrl } from "@/lib/supabase/storage";
+import { getVideoEmbedUrl } from "@/lib/videoEmbed";
 
 function cx(...a) {
   return a.filter(Boolean).join(" ");
@@ -22,7 +23,7 @@ function slugify(input) {
 function formatPrice(value) {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
 function safeId() {
@@ -65,10 +66,14 @@ export default function ProductsPanel() {
     featured: false,
     category_id: "",
     description: "",
+    video_testimonial_url: "",
+    video_testimonial_platform: "",
   });
 
   const [images, setImages] = useState([]);
   const [pendingFiles, setPendingFiles] = useState([]);
+  const [packages, setPackages] = useState([]);
+  const [capabilities, setCapabilities] = useState([]);
 
   const editingProduct = useMemo(
     () => products.find((p) => p.id === editingId) || null,
@@ -125,7 +130,7 @@ export default function ProductsPanel() {
         supabase
           .from("products")
           .select(
-            "id,name,slug,price,description,featured,category_id,created_at,product_images(id,image_url)",
+            "id,name,slug,price,description,featured,category_id,video_testimonial_url,video_testimonial_platform,created_at,product_images(id,image_url),product_packages(id,name,price,description,sort_order,active),product_capabilities(id,name,sort_order)",
           )
           .order("created_at", { ascending: false }),
       ]);
@@ -152,6 +157,8 @@ export default function ProductsPanel() {
     setMode("new");
     setEditingId(null);
     setImages([]);
+    setPackages([]);
+    setCapabilities([]);
     setForm({
       name: "",
       urlName: "",
@@ -159,6 +166,8 @@ export default function ProductsPanel() {
       featured: false,
       category_id: "",
       description: "",
+      video_testimonial_url: "",
+      video_testimonial_platform: "",
     });
     setErr("");
   }
@@ -168,6 +177,10 @@ export default function ProductsPanel() {
     setMode("edit");
     setEditingId(p.id);
     setImages(Array.isArray(p.product_images) ? p.product_images : []);
+    setPackages(Array.isArray(p.product_packages) ? p.product_packages : []);
+    setCapabilities(
+      Array.isArray(p.product_capabilities) ? p.product_capabilities : [],
+    );
     setForm({
       name: p.name || "",
       urlName: p.slug || "",
@@ -175,6 +188,8 @@ export default function ProductsPanel() {
       featured: !!p.featured,
       category_id: p.category_id || "",
       description: p.description || "",
+      video_testimonial_url: p.video_testimonial_url || "",
+      video_testimonial_platform: p.video_testimonial_platform || "",
     });
     setErr("");
   }
@@ -184,6 +199,8 @@ export default function ProductsPanel() {
     setMode("list");
     setEditingId(null);
     setImages([]);
+    setPackages([]);
+    setCapabilities([]);
     setErr("");
   }
 
@@ -251,6 +268,43 @@ export default function ProductsPanel() {
       return;
     }
 
+    if (
+      form.video_testimonial_url.trim() &&
+      !getVideoEmbedUrl(
+        form.video_testimonial_url.trim(),
+        form.video_testimonial_platform,
+      )
+    ) {
+      setSaving(false);
+      setErr("Enter a valid YouTube or Facebook video URL.");
+      return;
+    }
+
+    const enteredPackages = packages.filter(
+      (item) =>
+        item.name.trim() || item.price !== "" || item.description?.trim(),
+    );
+    const invalidPackage = enteredPackages.find(
+      (item) =>
+        !item.name.trim() ||
+        item.name.trim().length > 160 ||
+        formatPrice(item.price) === null,
+    );
+    if (invalidPackage) {
+      setSaving(false);
+      setErr("Each package needs a name and a finite price of zero or more.");
+      return;
+    }
+
+    const invalidCapability = capabilities.find(
+      (item) => item.name.trim().length > 120,
+    );
+    if (invalidCapability) {
+      setSaving(false);
+      setErr("Capability names must be 120 characters or fewer.");
+      return;
+    }
+
     const payload = {
       name,
       slug,
@@ -258,6 +312,8 @@ export default function ProductsPanel() {
       description: form.description || null,
       featured: !!form.featured,
       category_id: form.category_id || null,
+      video_testimonial_url: form.video_testimonial_url.trim() || null,
+      video_testimonial_platform: form.video_testimonial_platform || null,
     };
 
     let res;
@@ -300,6 +356,49 @@ export default function ProductsPanel() {
 
         setImages((prev) => [...prev, ...uploadedRows]);
         resetPendingFiles();
+      }
+
+      const { error: packageDeleteError } = await supabase
+        .from("product_packages")
+        .delete()
+        .eq("product_id", productId);
+      if (packageDeleteError) throw packageDeleteError;
+
+      const packageRows = enteredPackages
+        .filter((item) => item.name.trim() && formatPrice(item.price) !== null)
+        .map((item, index) => ({
+          product_id: productId,
+          name: item.name.trim(),
+          price: formatPrice(item.price),
+          description: item.description?.trim() || null,
+          sort_order: index,
+          active: item.active !== false,
+        }));
+      if (packageRows.length) {
+        const { error } = await supabase
+          .from("product_packages")
+          .insert(packageRows);
+        if (error) throw error;
+      }
+
+      const { error: capabilityDeleteError } = await supabase
+        .from("product_capabilities")
+        .delete()
+        .eq("product_id", productId);
+      if (capabilityDeleteError) throw capabilityDeleteError;
+
+      const capabilityRows = capabilities
+        .filter((item) => item.name.trim())
+        .map((item, index) => ({
+          product_id: productId,
+          name: item.name.trim(),
+          sort_order: index,
+        }));
+      if (capabilityRows.length) {
+        const { error } = await supabase
+          .from("product_capabilities")
+          .insert(capabilityRows);
+        if (error) throw error;
       }
 
       await loadAll();
@@ -438,6 +537,41 @@ export default function ProductsPanel() {
 
     setPendingFiles((prev) => [...prev, ...prepared]);
     e.target.value = "";
+  }
+
+  function addPackage() {
+    setPackages((items) => [
+      ...items,
+      { id: safeId(), name: "", price: "", description: "", active: true },
+    ]);
+  }
+
+  function updatePackage(id, changes) {
+    setPackages((items) =>
+      items.map((item) => (item.id === id ? { ...item, ...changes } : item)),
+    );
+  }
+
+  function movePackage(id, direction) {
+    setPackages((items) => {
+      const index = items.findIndex((item) => item.id === id);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= items.length) return items;
+
+      const next = [...items];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  }
+
+  function addCapability() {
+    setCapabilities((items) => [...items, { id: safeId(), name: "" }]);
+  }
+
+  function updateCapability(id, name) {
+    setCapabilities((items) =>
+      items.map((item) => (item.id === id ? { ...item, name } : item)),
+    );
   }
 
   const header = (
@@ -649,6 +783,191 @@ export default function ProductsPanel() {
                     className="mt-1 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500/30"
                     placeholder="Write a clean, buyer-friendly description."
                   />
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold">Packages</div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        Optional package prices replace the base price when
+                        selected.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addPackage}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold hover:bg-slate-100"
+                    >
+                      Add package
+                    </button>
+                  </div>
+
+                  <div className="mt-3 space-y-3">
+                    {packages.map((item) => (
+                      <div
+                        key={item.id}
+                        className="rounded-xl border border-slate-200 bg-white p-3"
+                      >
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <input
+                            value={item.name}
+                            onChange={(e) =>
+                              updatePackage(item.id, { name: e.target.value })
+                            }
+                            placeholder="Package name"
+                            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                          />
+                          <input
+                            value={item.price}
+                            onChange={(e) =>
+                              updatePackage(item.id, { price: e.target.value })
+                            }
+                            placeholder="Price (NGN)"
+                            inputMode="numeric"
+                            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <div className="mt-2 flex gap-2">
+                          <input
+                            value={item.description || ""}
+                            onChange={(e) =>
+                              updatePackage(item.id, {
+                                description: e.target.value,
+                              })
+                            }
+                            placeholder="Optional description"
+                            className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPackages((items) =>
+                                items.filter((entry) => entry.id !== item.id),
+                              )
+                            }
+                            className="rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => movePackage(item.id, -1)}
+                            disabled={packages.indexOf(item) === 0}
+                            className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold disabled:opacity-40"
+                          >
+                            Move up
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => movePackage(item.id, 1)}
+                            disabled={
+                              packages.indexOf(item) === packages.length - 1
+                            }
+                            className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold disabled:opacity-40"
+                          >
+                            Move down
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updatePackage(item.id, {
+                                active: item.active === false,
+                              })
+                            }
+                            className={cx(
+                              "rounded-xl border px-3 py-2 text-xs font-semibold",
+                              item.active === false
+                                ? "border-green-200 text-green-700"
+                                : "border-amber-200 text-amber-700",
+                            )}
+                          >
+                            {item.active === false ? "Activate" : "Deactivate"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold">
+                        What Can It Power?
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        Add the appliances this product can support.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addCapability}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold hover:bg-slate-100"
+                    >
+                      Add item
+                    </button>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {capabilities.map((item) => (
+                      <div key={item.id} className="flex gap-2">
+                        <input
+                          value={item.name}
+                          onChange={(e) =>
+                            updateCapability(item.id, e.target.value)
+                          }
+                          placeholder="e.g. Freezer"
+                          className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCapabilities((items) =>
+                              items.filter((entry) => entry.id !== item.id),
+                            )
+                          }
+                          className="rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-sm font-semibold">
+                    Client video testimonial
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[10rem,1fr]">
+                    <select
+                      value={form.video_testimonial_platform}
+                      onChange={(e) =>
+                        setForm((s) => ({
+                          ...s,
+                          video_testimonial_platform: e.target.value,
+                        }))
+                      }
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">Platform</option>
+                      <option value="youtube">YouTube</option>
+                      <option value="facebook">Facebook</option>
+                    </select>
+                    <input
+                      value={form.video_testimonial_url}
+                      onChange={(e) =>
+                        setForm((s) => ({
+                          ...s,
+                          video_testimonial_url: e.target.value,
+                        }))
+                      }
+                      placeholder="YouTube or Facebook video URL"
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
                 </div>
 
                 <label className="flex items-center gap-2 text-sm text-slate-700">

@@ -35,11 +35,17 @@ function getProductImage(product) {
   return product?.images?.[0]?.image_url || "";
 }
 
-function buildSingleProductCartItem(product) {
+function buildSingleProductCartItem(product, selectedPackage) {
+  const price = Number(selectedPackage?.price ?? product.price ?? 0);
   return {
-    id: product.id,
-    name: product.name,
-    price: Number(product.price || 0),
+    id: selectedPackage ? `${product.id}:${selectedPackage.id}` : product.id,
+    product_id: product.id,
+    package_id: selectedPackage?.id || null,
+    package_name: selectedPackage?.name || null,
+    name: selectedPackage
+      ? `${product.name} — ${selectedPackage.name}`
+      : product.name,
+    price,
     image: getProductImage(product),
     quantity: 1,
   };
@@ -47,6 +53,11 @@ function buildSingleProductCartItem(product) {
 
 export default function BuyBar({ product, waLink }) {
   const { addItem, openCart } = useCart();
+  const packages = (product.packages || []).filter((item) => item.active !== false);
+  const [selectedPackageId, setSelectedPackageId] = useState(
+    packages[0]?.id || "",
+  );
+  const selectedPackage = packages.find((item) => item.id === selectedPackageId);
 
   const [added, setAdded] = useState(false);
   const [showOrderForm, setShowOrderForm] = useState(false);
@@ -60,19 +71,14 @@ export default function BuyBar({ product, waLink }) {
   const [submittedOrder, setSubmittedOrder] = useState(null);
 
   const productTotal = useMemo(
-    () => Number(product.price || 0),
-    [product.price],
+    () => Number(selectedPackage?.price ?? product.price ?? 0),
+    [product.price, selectedPackage?.price],
   );
   const requiresDeposit = productTotal > HIGH_VALUE_THRESHOLD;
   const depositAmount = requiresDeposit ? Math.round(productTotal * 0.6) : 0;
 
   function onAddToCart() {
-    addItem({
-      id: product.id,
-      name: product.name,
-      price: product.price ?? 0,
-      image: getProductImage(product),
-    });
+    addItem(buildSingleProductCartItem(product, selectedPackage));
 
     openCart();
     setAdded(true);
@@ -131,7 +137,7 @@ export default function BuyBar({ product, waLink }) {
       }
 
       const order = await createOrder({
-        cartItems: [buildSingleProductCartItem(product)],
+        cartItems: [buildSingleProductCartItem(product, selectedPackage)],
         customer: {
           name: customerName.trim(),
           phone: customerPhone.trim(),
@@ -168,9 +174,11 @@ export default function BuyBar({ product, waLink }) {
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="text-sm text-slate-600">Price</div>
+          <div className="text-sm text-slate-600">
+            {selectedPackage ? "Selected package price" : "Price"}
+          </div>
           <div className="text-xl font-extrabold text-amber-600">
-            {formatCurrency(product.price)}
+            {formatCurrency(productTotal)}
           </div>
 
           {requiresDeposit ? (
@@ -198,6 +206,30 @@ export default function BuyBar({ product, waLink }) {
           </button>
         </div>
       </div>
+
+      {packages.length ? (
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <label className="text-sm font-semibold text-slate-900">
+            Choose a package
+          </label>
+          <select
+            value={selectedPackageId}
+            onChange={(e) => setSelectedPackageId(e.target.value)}
+            className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900"
+          >
+            {packages.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name} — {formatCurrency(item.price)}
+              </option>
+            ))}
+          </select>
+          {selectedPackage?.description ? (
+            <div className="mt-2 text-xs text-slate-600">
+              {selectedPackage.description}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="mt-3 text-xs text-slate-600">
         Fill your details here first. You can continue on WhatsApp after the

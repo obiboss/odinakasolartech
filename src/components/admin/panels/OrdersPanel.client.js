@@ -86,6 +86,7 @@ export default function OrdersPanel() {
             id,
             quantity,
             price_at_purchase,
+            package_name,
             product:products (
               id,
               name,
@@ -318,6 +319,11 @@ export default function OrdersPanel() {
                             <div className="font-semibold text-slate-900">
                               {item?.product?.name || "Product unavailable"}
                             </div>
+                            {item.package_name ? (
+                              <div className="text-xs text-slate-600">
+                                Package: {item.package_name}
+                              </div>
+                            ) : null}
 
                             {item?.product?.slug ? (
                               <div className="mt-1 text-xs text-slate-500">

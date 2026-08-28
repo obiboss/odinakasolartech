@@ -12,6 +12,7 @@ import FeaturedCarousel from "@/components/shop/FeaturedCarousel.client";
 import JsonLd from "@/components/seo/JsonLd";
 import ProductViewTracker from "@/components/analytics/ProductViewTracker.client";
 import { normalizeProductRecord } from "@/lib/supabase/storage";
+import { getVideoEmbedUrl } from "@/lib/videoEmbed";
 
 export const revalidate = 300;
 
@@ -94,6 +95,8 @@ const getProductBySlug = cache(async (slug) => {
       featured,
       active,
       specs,
+      video_testimonial_url,
+      video_testimonial_platform,
       category_id,
       created_at,
       updated_at,
@@ -115,6 +118,19 @@ const getProductBySlug = cache(async (slug) => {
         image_url,
         created_at,
         status
+      ),
+      packages:product_packages (
+        id,
+        name,
+        price,
+        description,
+        sort_order,
+        active
+      ),
+      capabilities:product_capabilities (
+        id,
+        name,
+        sort_order
       )
     `,
     )
@@ -293,6 +309,16 @@ export default async function ProductPage({ params }) {
   const approvedReviews = getApprovedReviews(product);
   const averageRating = getAverageRating(approvedReviews);
   const descriptionParts = splitProductDescription(product.description);
+  const videoEmbed = getVideoEmbedUrl(
+    product.video_testimonial_url,
+    product.video_testimonial_platform,
+  );
+  const packages = (product.packages || [])
+    .filter((item) => item.active !== false)
+    .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  const capabilities = (product.capabilities || []).sort(
+    (a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0),
+  );
 
   const wa = whatsappLink({
     phone: store.business.whatsapp,
@@ -315,20 +341,36 @@ export default async function ProductPage({ params }) {
       "@type": "Brand",
       name: BRAND_NAME,
     },
-    offers: {
-      "@type": "Offer",
-      url: productUrl,
-      priceCurrency: product.currency || "NGN",
-      price: product.price ? String(product.price) : "0",
-      availability: product.in_stock
-        ? "https://schema.org/InStock"
-        : "https://schema.org/OutOfStock",
-      itemCondition: "https://schema.org/NewCondition",
-      seller: {
-        "@type": "Organization",
-        name: BRAND_NAME,
-      },
-    },
+    offers: packages.length
+      ? {
+          "@type": "AggregateOffer",
+          url: productUrl,
+          priceCurrency: product.currency || "NGN",
+          lowPrice: String(
+            Math.min(...packages.map((item) => Number(item.price))),
+          ),
+          highPrice: String(
+            Math.max(...packages.map((item) => Number(item.price))),
+          ),
+          offerCount: String(packages.length),
+          availability: product.in_stock
+            ? "https://schema.org/InStock"
+            : "https://schema.org/OutOfStock",
+        }
+      : {
+          "@type": "Offer",
+          url: productUrl,
+          priceCurrency: product.currency || "NGN",
+          price: product.price != null ? String(product.price) : "0",
+          availability: product.in_stock
+            ? "https://schema.org/InStock"
+            : "https://schema.org/OutOfStock",
+          itemCondition: "https://schema.org/NewCondition",
+          seller: {
+            "@type": "Organization",
+            name: BRAND_NAME,
+          },
+        },
     ...(averageRating
       ? {
           aggregateRating: {
@@ -403,9 +445,11 @@ export default async function ProductPage({ params }) {
         name: `How much is ${product.name}?`,
         acceptedAnswer: {
           "@type": "Answer",
-          text: product.price
-            ? `${product.name} is listed at ${product.currency || "NGN"} ${Number(product.price).toLocaleString("en-NG")}.`
-            : `Please contact ${BRAND_NAME} to confirm the current price for ${product.name}.`,
+          text: packages.length
+            ? `${product.name} has ${packages.length} package options. Please choose a package to see its current price.`
+            : product.price != null
+              ? `${product.name} is listed at ${product.currency || "NGN"} ${Number(product.price).toLocaleString("en-NG")}.`
+              : `Please contact ${BRAND_NAME} to confirm the current price for ${product.name}.`,
         },
       },
       {
@@ -505,6 +549,77 @@ export default async function ProductPage({ params }) {
               <BuyBar product={product} waLink={wa} />
             </div>
           </div>
+
+          {capabilities.length ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="text-xl font-bold text-slate-900">
+                What Can It Power?
+              </h2>
+              <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+                {capabilities.map((item) => (
+                  <li
+                    key={item.id}
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700"
+                  >
+                    {item.name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {videoEmbed ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="text-xl font-bold text-slate-900">
+                Client Video Testimonial
+              </h2>
+              <div
+                className="relative mt-4 overflow-hidden rounded-xl bg-slate-100"
+                style={{ aspectRatio: videoEmbed.aspectRatio }}
+              >
+                <iframe
+                  src={videoEmbed.url}
+                  title="Client video testimonial"
+                  className="absolute inset-0 h-full w-full"
+                  loading="lazy"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {packages.length ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="text-xl font-bold text-slate-900">
+                Package Options
+              </h2>
+              <div className="mt-4 space-y-3">
+                {packages.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-xl border border-slate-200 p-4"
+                  >
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <div className="font-semibold text-slate-900">
+                        {item.name}
+                      </div>
+                      <div className="font-bold text-amber-600">
+                        {item.price == null
+                          ? "Request price"
+                          : `${product.currency || "NGN"} ${Number(item.price).toLocaleString("en-NG")}`}
+                      </div>
+                    </div>
+                    {item.description ? (
+                      <div className="mt-2 text-sm text-slate-600">
+                        {item.description}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">

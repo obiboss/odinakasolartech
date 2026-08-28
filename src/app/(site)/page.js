@@ -34,15 +34,19 @@ export default async function HomePage() {
   const normalizedLatestProducts = (latestProducts || []).map(
     normalizeProductRecord,
   );
-  const featuredReviewIds = new Set(
-    (featuredReviews || []).map((review) => review.id),
-  );
-  const testimonialReviews = [
-    ...(featuredReviews || []),
-    ...(approvedReviews || []).filter(
-      (review) => !featuredReviewIds.has(review.id),
-    ),
-  ].slice(0, 3);
+  const testimonialReviews = Array.from(
+    new Map(
+      [...(featuredReviews || []), ...(approvedReviews || [])].map((review) => [
+        review.id,
+        review,
+      ]),
+    ).values(),
+  )
+    .sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    )
+    .slice(0, 10);
 
   return (
     <>

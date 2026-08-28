@@ -80,7 +80,7 @@ async function loadFeaturedReviews() {
     .eq("status", "approved")
     .eq("featured", true)
     .order("created_at", { ascending: false })
-    .limit(3);
+    .limit(10);
 
   if (error) console.log("SUPABASE ERROR (featured reviews):", error);
   return data || [];
@@ -92,16 +92,20 @@ async function loadApprovedReviews() {
     .select("id, display_name, rating, content, status, featured, created_at")
     .eq("status", "approved")
     .order("created_at", { ascending: false })
-    .limit(3);
+    .limit(10);
 
   if (error) console.log("SUPABASE ERROR (approved reviews):", error);
   return data || [];
 }
 
-const getSpecialOffers = unstable_cache(loadSpecialOffers, ["homepage-special-offers"], {
-  revalidate: HOMEPAGE_REVALIDATE_SECONDS,
-  tags: [HOMEPAGE_CACHE_TAGS.specialOffers],
-});
+const getSpecialOffers = unstable_cache(
+  loadSpecialOffers,
+  ["homepage-special-offers"],
+  {
+    revalidate: HOMEPAGE_REVALIDATE_SECONDS,
+    tags: [HOMEPAGE_CACHE_TAGS.specialOffers],
+  },
+);
 
 const getFeaturedProducts = unstable_cache(
   loadFeaturedProducts,
@@ -112,10 +116,14 @@ const getFeaturedProducts = unstable_cache(
   },
 );
 
-const getLatestProducts = unstable_cache(loadLatestProducts, ["homepage-latest-products"], {
-  revalidate: HOMEPAGE_REVALIDATE_SECONDS,
-  tags: [HOMEPAGE_CACHE_TAGS.latestProducts],
-});
+const getLatestProducts = unstable_cache(
+  loadLatestProducts,
+  ["homepage-latest-products"],
+  {
+    revalidate: HOMEPAGE_REVALIDATE_SECONDS,
+    tags: [HOMEPAGE_CACHE_TAGS.latestProducts],
+  },
+);
 
 const getFeaturedReviews = unstable_cache(
   loadFeaturedReviews,
