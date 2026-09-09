@@ -52,6 +52,16 @@ function normalizeProductRecord(product) {
     });
   }
 
+  if (Array.isArray(product.packages)) {
+    normalized.packages = product.packages.map((item) => {
+      if (!item || typeof item !== "object") return item;
+      return {
+        ...item,
+        image_url: normalizeSupabaseStorageUrl(item.image_url),
+      };
+    });
+  }
+
   return normalized;
 }
 

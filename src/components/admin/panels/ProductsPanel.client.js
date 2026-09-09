@@ -6,6 +6,13 @@ import Image from "next/image";
 import { supabase } from "@/lib/supabase/client";
 import { getStoragePublicUrl } from "@/lib/supabase/storage";
 import { getVideoEmbedUrl } from "@/lib/videoEmbed";
+import ProductSalesContentEditor from "@/components/admin/ProductSalesContentEditor.client";
+import ProductPackageEditor from "@/components/admin/ProductPackageEditor.client";
+import {
+  createDefaultSalesPageContent,
+  getSalesPageRecord,
+  normalizeSalesPageContent,
+} from "@/lib/salesPage";
 
 function cx(...a) {
   return a.filter(Boolean).join(" ");
@@ -24,6 +31,16 @@ function formatPrice(value) {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+function cleanPackageList(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || "").trim()).filter(Boolean);
+  }
+  return String(value || "")
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function safeId() {
@@ -74,6 +91,9 @@ export default function ProductsPanel() {
   const [pendingFiles, setPendingFiles] = useState([]);
   const [packages, setPackages] = useState([]);
   const [capabilities, setCapabilities] = useState([]);
+  const [salesPageContent, setSalesPageContent] = useState(
+    createDefaultSalesPageContent(),
+  );
 
   const editingProduct = useMemo(
     () => products.find((p) => p.id === editingId) || null,
@@ -130,7 +150,7 @@ export default function ProductsPanel() {
         supabase
           .from("products")
           .select(
-            "id,name,slug,price,description,featured,category_id,video_testimonial_url,video_testimonial_platform,created_at,product_images(id,image_url),product_packages(id,name,price,description,sort_order,active),product_capabilities(id,name,sort_order)",
+            "id,name,slug,price,description,featured,category_id,video_testimonial_url,video_testimonial_platform,created_at,product_images(id,image_url),product_packages(id,name,price,normal_price,description,image_url,included_items,bonuses,warranty,delivery,payment,cta_text,sort_order,featured,active),product_capabilities(id,name,sort_order),product_sales_page:product_sales_pages(id,enabled,content)",
           )
           .order("created_at", { ascending: false }),
       ]);
@@ -154,11 +174,13 @@ export default function ProductsPanel() {
 
   function startNew() {
     resetPendingFiles();
+    releasePackagePreviews();
     setMode("new");
     setEditingId(null);
     setImages([]);
     setPackages([]);
     setCapabilities([]);
+    setSalesPageContent(createDefaultSalesPageContent());
     setForm({
       name: "",
       urlName: "",
@@ -174,12 +196,17 @@ export default function ProductsPanel() {
 
   function startEdit(p) {
     resetPendingFiles();
+    releasePackagePreviews();
     setMode("edit");
     setEditingId(p.id);
     setImages(Array.isArray(p.product_images) ? p.product_images : []);
     setPackages(Array.isArray(p.product_packages) ? p.product_packages : []);
     setCapabilities(
       Array.isArray(p.product_capabilities) ? p.product_capabilities : [],
+    );
+    const salesPage = getSalesPageRecord(p.product_sales_page);
+    setSalesPageContent(
+      normalizeSalesPageContent(salesPage?.content),
     );
     setForm({
       name: p.name || "",
@@ -196,11 +223,13 @@ export default function ProductsPanel() {
 
   function backToList() {
     resetPendingFiles();
+    releasePackagePreviews();
     setMode("list");
     setEditingId(null);
     setImages([]);
     setPackages([]);
     setCapabilities([]);
+    setSalesPageContent(createDefaultSalesPageContent());
     setErr("");
   }
 
@@ -210,28 +239,7 @@ export default function ProductsPanel() {
     const insertedRows = [];
 
     for (const file of files) {
-      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-      const path = generateImageUploadPath(productId, ext);
-
-      const up = await supabase.storage
-        .from("product-images")
-        .upload(path, file, {
-          cacheControl: "31536000",
-          upsert: false,
-          contentType: file.type || "image/jpeg",
-        });
-
-      if (up.error) {
-        throw new Error(up.error.message);
-      }
-
-      const image_url = getStoragePublicUrl(supabase, "product-images", path);
-
-      if (!image_url) {
-        throw new Error(
-          "Upload succeeded, but public URL could not be created.",
-        );
-      }
+      const image_url = await uploadFileToProductStorage(productId, file);
 
       const ins = await supabase
         .from("product_images")
@@ -247,6 +255,26 @@ export default function ProductsPanel() {
     }
 
     return insertedRows;
+  }
+
+  async function uploadFileToProductStorage(productId, file) {
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = generateImageUploadPath(productId, ext);
+    const up = await supabase.storage
+      .from("product-images")
+      .upload(path, file, {
+        cacheControl: "31536000",
+        upsert: false,
+        contentType: file.type || "image/jpeg",
+      });
+
+    if (up.error) throw new Error(up.error.message);
+
+    const imageUrl = getStoragePublicUrl(supabase, "product-images", path);
+    if (!imageUrl) {
+      throw new Error("Upload succeeded, but public URL could not be created.");
+    }
+    return imageUrl;
   }
 
   async function saveProduct() {
@@ -282,17 +310,28 @@ export default function ProductsPanel() {
 
     const enteredPackages = packages.filter(
       (item) =>
-        item.name.trim() || item.price !== "" || item.description?.trim(),
+        item.name?.trim() ||
+        item.price !== "" ||
+        item.normal_price !== "" ||
+        item.description?.trim(),
     );
-    const invalidPackage = enteredPackages.find(
-      (item) =>
-        !item.name.trim() ||
+    const invalidPackage = enteredPackages.find((item) => {
+      const salePrice = formatPrice(item.price);
+      const normalPrice =
+        item.normal_price === "" || item.normal_price === null || item.normal_price === undefined
+          ? null
+          : formatPrice(item.normal_price);
+      return (
+        !item.name?.trim() ||
         item.name.trim().length > 160 ||
-        formatPrice(item.price) === null,
-    );
+        salePrice === null ||
+        (item.normal_price !== "" && item.normal_price !== null && item.normal_price !== undefined && normalPrice === null) ||
+        (normalPrice !== null && normalPrice < salePrice)
+      );
+    });
     if (invalidPackage) {
       setSaving(false);
-      setErr("Each package needs a name and a finite price of zero or more.");
+      setErr("Each package needs a valid sale price, and normal price must be valid and no lower than the sale price.");
       return;
     }
 
@@ -358,26 +397,119 @@ export default function ProductsPanel() {
         resetPendingFiles();
       }
 
-      const { error: packageDeleteError } = await supabase
-        .from("product_packages")
-        .delete()
-        .eq("product_id", productId);
-      if (packageDeleteError) throw packageDeleteError;
+      // Keep package IDs stable so existing order_items retain their package
+      // relationship. Removed packages are deactivated instead of deleted.
+      const { data: existingPackageRows, error: existingPackageError } =
+        await supabase
+          .from("product_packages")
+          .select("id,image_url")
+          .eq("product_id", productId);
+      if (existingPackageError) throw existingPackageError;
 
-      const packageRows = enteredPackages
-        .filter((item) => item.name.trim() && formatPrice(item.price) !== null)
-        .map((item, index) => ({
+      const existingPackageById = new Map(
+        (existingPackageRows || []).map((item) => [item.id, item]),
+      );
+      const savedPackageIds = new Set();
+      for (const [index, item] of enteredPackages.entries()) {
+        const salePrice = formatPrice(item.price);
+        const normalPrice =
+          item.normal_price === "" || item.normal_price === null || item.normal_price === undefined
+            ? null
+            : formatPrice(item.normal_price);
+        let imageUrl = item.image_url || null;
+        if (item.imageFile) {
+          imageUrl = await uploadFileToProductStorage(productId, item.imageFile);
+        } else if (item.remove_image) {
+          imageUrl = null;
+        }
+
+        const row = {
           product_id: productId,
           name: item.name.trim(),
-          price: formatPrice(item.price),
+          price: salePrice,
+          normal_price: normalPrice,
           description: item.description?.trim() || null,
+          image_url: imageUrl,
+          included_items: cleanPackageList(item.included_items),
+          bonuses: cleanPackageList(item.bonuses),
+          warranty: item.warranty?.trim() || null,
+          delivery: item.delivery?.trim() || null,
+          payment: item.payment?.trim() || null,
+          cta_text: item.cta_text?.trim() || "I WANT THIS PACKAGE",
           sort_order: index,
+          featured: item.featured === true,
           active: item.active !== false,
-        }));
-      if (packageRows.length) {
+        };
+        // New packages receive a client UUID, so the ID format cannot tell us
+        // whether the row exists in Supabase. Use the database snapshot from
+        // above instead; this ensures new UUIDs take the INSERT path.
+        const isExisting = existingPackageById.has(item.id);
+
+        console.groupCollapsed(
+          `[Admin package save] ${isExisting ? "UPDATE" : "INSERT"} ${item.name || "unnamed package"}`,
+        );
+        console.log("Package object submitted:", item);
+        console.log("item.id:", item.id);
+        console.log("isExisting:", isExisting);
+        console.log("product_id:", productId);
+        console.log("Payload:", row);
+
+        if (isExisting) {
+          const response = await supabase
+            .from("product_packages")
+            .update(row)
+            .eq("id", item.id)
+            .eq("product_id", productId)
+            .select("id")
+            .single();
+          console.log("Supabase UPDATE response:", response);
+          if (response.error) {
+            console.error("Supabase UPDATE error:", response.error);
+            throw response.error;
+          }
+          if (!response.data?.id) {
+            throw new Error(`Package update returned no row for ${item.id}.`);
+          }
+          console.log("Returned updated row:", response.data);
+          savedPackageIds.add(response.data.id);
+        } else {
+          const response = await supabase
+            .from("product_packages")
+            .insert(row)
+            .select("id,product_id,name,price,normal_price,image_url,included_items,bonuses,active,sort_order")
+            .single();
+          console.log("Supabase INSERT response:", response);
+          if (response.error) {
+            console.error("Supabase INSERT error:", response.error);
+            throw response.error;
+          }
+          if (!response.data?.id) {
+            throw new Error("Package INSERT returned no inserted row.");
+          }
+          console.log("Returned inserted row:", response.data);
+          savedPackageIds.add(response.data.id);
+        }
+
+        console.groupEnd();
+
+        const oldImageUrl = existingPackageById.get(item.id)?.image_url;
+        if (oldImageUrl && oldImageUrl !== imageUrl) {
+          const oldPath = extractStoragePathFromPublicUrl(oldImageUrl);
+          if (oldPath) {
+            await supabase.storage.from("product-images").remove([oldPath]);
+          }
+        }
+      }
+
+      const packagesToDeactivate = (existingPackageRows || [])
+        .map((item) => item.id)
+        .filter((id) => !savedPackageIds.has(id));
+      if (packagesToDeactivate.length) {
         const { error } = await supabase
           .from("product_packages")
-          .insert(packageRows);
+          .update({ active: false })
+          .in("id", packagesToDeactivate)
+          .eq("product_id", productId);
         if (error) throw error;
       }
 
@@ -400,6 +532,47 @@ export default function ProductsPanel() {
           .insert(capabilityRows);
         if (error) throw error;
       }
+
+      const testimonialItems = [];
+      for (const testimonial of salesPageContent.testimonials?.items || []) {
+        let imageUrl = testimonial.remove_image ? "" : testimonial.image_url || "";
+        if (testimonial.imageFile) imageUrl = await uploadFileToProductStorage(productId, testimonial.imageFile);
+        testimonialItems.push({
+          id: testimonial.id || safeId(),
+          name: testimonial.name?.trim() || "",
+          text: testimonial.text?.trim() || "",
+          image_url: imageUrl || "",
+          active: testimonial.active !== false,
+        });
+      }
+      const savedSalesPageContent = {
+        ...salesPageContent,
+        testimonials: { ...salesPageContent.testimonials, items: testimonialItems },
+      };
+
+      const { error: salesPageError } = await supabase
+        .from("product_sales_pages")
+        .upsert(
+          {
+            product_id: productId,
+            enabled: true,
+            content: savedSalesPageContent,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "product_id" },
+        );
+      if (salesPageError) throw salesPageError;
+
+      // The product route is ISR-backed. Refresh both the current slug and a
+      // previous slug when an admin renames the product, without changing the
+      // existing cart/order flow or making the whole app uncached.
+      await fetch("/api/revalidate-product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slugs: [slug, editingProduct?.slug],
+        }),
+      }).catch(() => {});
 
       await loadAll();
       setSaving(false);
@@ -542,13 +715,47 @@ export default function ProductsPanel() {
   function addPackage() {
     setPackages((items) => [
       ...items,
-      { id: safeId(), name: "", price: "", description: "", active: true },
+      {
+        id: safeId(),
+        name: "",
+        price: "",
+        normal_price: "",
+        description: "",
+        image_url: "",
+        imagePreviewUrl: "",
+        imageFile: null,
+        remove_image: false,
+        included_items: [],
+        bonuses: [],
+        warranty: "",
+        delivery: "",
+        payment: "",
+        cta_text: "I WANT THIS PACKAGE",
+        featured: false,
+        active: true,
+      },
     ]);
+  }
+
+  function releasePackagePreviews(items = packages) {
+    items.forEach((item) => {
+      if (item.imagePreviewUrl) URL.revokeObjectURL(item.imagePreviewUrl);
+    });
   }
 
   function updatePackage(id, changes) {
     setPackages((items) =>
-      items.map((item) => (item.id === id ? { ...item, ...changes } : item)),
+      items.map((item) => {
+        if (item.id !== id) return item;
+        if (
+          changes.imagePreviewUrl &&
+          item.imagePreviewUrl &&
+          changes.imagePreviewUrl !== item.imagePreviewUrl
+        ) {
+          URL.revokeObjectURL(item.imagePreviewUrl);
+        }
+        return { ...item, ...changes };
+      }),
     );
   }
 
@@ -785,112 +992,18 @@ export default function ProductsPanel() {
                   />
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold">Packages</div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        Optional package prices replace the base price when
-                        selected.
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={addPackage}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold hover:bg-slate-100"
-                    >
-                      Add package
-                    </button>
-                  </div>
-
-                  <div className="mt-3 space-y-3">
-                    {packages.map((item) => (
-                      <div
-                        key={item.id}
-                        className="rounded-xl border border-slate-200 bg-white p-3"
-                      >
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <input
-                            value={item.name}
-                            onChange={(e) =>
-                              updatePackage(item.id, { name: e.target.value })
-                            }
-                            placeholder="Package name"
-                            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                          />
-                          <input
-                            value={item.price}
-                            onChange={(e) =>
-                              updatePackage(item.id, { price: e.target.value })
-                            }
-                            placeholder="Price (NGN)"
-                            inputMode="numeric"
-                            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                          />
-                        </div>
-                        <div className="mt-2 flex gap-2">
-                          <input
-                            value={item.description || ""}
-                            onChange={(e) =>
-                              updatePackage(item.id, {
-                                description: e.target.value,
-                              })
-                            }
-                            placeholder="Optional description"
-                            className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                          />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPackages((items) =>
-                                items.filter((entry) => entry.id !== item.id),
-                              )
-                            }
-                            className="rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => movePackage(item.id, -1)}
-                            disabled={packages.indexOf(item) === 0}
-                            className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold disabled:opacity-40"
-                          >
-                            Move up
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => movePackage(item.id, 1)}
-                            disabled={
-                              packages.indexOf(item) === packages.length - 1
-                            }
-                            className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold disabled:opacity-40"
-                          >
-                            Move down
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updatePackage(item.id, {
-                                active: item.active === false,
-                              })
-                            }
-                            className={cx(
-                              "rounded-xl border px-3 py-2 text-xs font-semibold",
-                              item.active === false
-                                ? "border-green-200 text-green-700"
-                                : "border-amber-200 text-amber-700",
-                            )}
-                          >
-                            {item.active === false ? "Activate" : "Deactivate"}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <ProductPackageEditor
+                  packages={packages}
+                  onAdd={addPackage}
+                  onUpdate={updatePackage}
+                  onRemove={(id) =>
+                    setPackages((items) =>
+                      items.filter((entry) => entry.id !== id),
+                    )
+                  }
+                  onMove={movePackage}
+                  onError={setErr}
+                />
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-center justify-between gap-3">
@@ -969,6 +1082,11 @@ export default function ProductsPanel() {
                     />
                   </div>
                 </div>
+
+                <ProductSalesContentEditor
+                  value={salesPageContent}
+                  onChange={setSalesPageContent}
+                />
 
                 <label className="flex items-center gap-2 text-sm text-slate-700">
                   <input

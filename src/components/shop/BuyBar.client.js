@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useCart } from "@/components/cart/CartContext.client";
 import { formatCurrency } from "@/lib/formatCurrency";
@@ -51,13 +51,80 @@ function buildSingleProductCartItem(product, selectedPackage) {
   };
 }
 
-export default function BuyBar({ product, waLink }) {
+function packageList(value) {
+  if (Array.isArray(value)) return value.filter(Boolean).map((item) => String(item));
+  return String(value || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+}
+
+function packageSavings(item) {
+  const sale = Number(item.price);
+  const normal = Number(item.normal_price);
+  return Number.isFinite(sale) && Number.isFinite(normal) && normal > sale
+    ? normal - sale
+    : 0;
+}
+
+function PackageCard({ item, product, selected, onSelect }) {
+  const salePrice = Number(item.price);
+  const normalPrice = Number(item.normal_price);
+  const hasSalePrice = Number.isFinite(salePrice) && salePrice >= 0;
+  const hasNormalPrice = item.normal_price !== null && item.normal_price !== undefined && item.normal_price !== "" && Number.isFinite(normalPrice) && normalPrice >= 0;
+  const savings = packageSavings(item);
+  const features = [
+    ...packageList(item.included_items),
+    ...packageList(item.bonuses).map((bonus) => `Bonus: ${bonus}`),
+    item.warranty ? `Warranty: ${item.warranty}` : "",
+    item.delivery ? `Delivery: ${item.delivery}` : "",
+    item.payment ? `Payment: ${item.payment}` : "",
+  ].filter(Boolean);
+  const image = item.image_url || getProductImage(product);
+
+  return (
+    <article className={`flex h-full flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition ${selected ? "border-orange-500 ring-2 ring-orange-200" : "border-slate-200"}`}>
+      <div className="relative flex aspect-[16/9] items-center justify-center overflow-hidden bg-slate-100">
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={image} alt={item.name || "Package"} className="h-full w-full object-contain" />
+        ) : <span className="text-xs font-semibold text-slate-400">Package image</span>}
+        {item.featured ? <span className="absolute left-3 top-3 rounded-full bg-amber-500 px-2 py-1 text-[10px] font-black uppercase text-slate-950">Recommended</span> : null}
+      </div>
+      <div className="flex flex-1 flex-col p-4">
+        <h3 className="text-xl font-black text-slate-950">{item.name}</h3>
+        {savings > 0 ? <div className="mt-2 text-xs font-black uppercase tracking-wide text-red-600">Save — {formatCurrency(savings)}</div> : null}
+        <div className="mt-3 text-3xl font-black text-amber-700">{hasSalePrice ? formatCurrency(salePrice) : "Request price"}</div>
+        {hasNormalPrice ? <div className={savings > 0 ? "mt-1 text-sm text-slate-500 line-through" : "mt-1 text-sm text-slate-500"}>Normal price — {formatCurrency(normalPrice)}</div> : null}
+        {item.description ? <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p> : null}
+        {features.length ? <ul className="mt-4 flex-1 space-y-2 text-sm leading-5 text-slate-700">{features.map((feature, index) => <li key={`${feature}-${index}`}>✓ {feature}</li>)}</ul> : <div className="flex-1" />}
+        <button type="button" onClick={() => onSelect(item.id)} aria-pressed={selected} className="mt-5 w-full rounded-xl border-2 border-[#d83b18] bg-[#ff5a2f] px-4 py-3 text-sm font-black text-white shadow-[0_4px_0_#b92f13] hover:bg-[#ff4b20]">{item.cta_text || "I WANT THIS PACKAGE"}</button>
+      </div>
+    </article>
+  );
+}
+
+export default function BuyBar({
+  product,
+  waLink,
+  addToCartLabel = "Add to cart",
+  confirmLabel = "WhatsApp to confirm",
+}) {
   const { addItem, openCart } = useCart();
   const packages = (product.packages || []).filter((item) => item.active !== false);
   const [selectedPackageId, setSelectedPackageId] = useState(
     packages[0]?.id || "",
   );
   const selectedPackage = packages.find((item) => item.id === selectedPackageId);
+  const purchasePanelRef = useRef(null);
+
+  useEffect(() => {
+    if (!packages.length) {
+      if (selectedPackageId) setSelectedPackageId("");
+      return;
+    }
+
+    if (!packages.some((item) => item.id === selectedPackageId)) {
+      setSelectedPackageId(packages[0].id);
+    }
+  }, [packages, selectedPackageId]);
 
   const [added, setAdded] = useState(false);
   const [showOrderForm, setShowOrderForm] = useState(false);
@@ -76,6 +143,14 @@ export default function BuyBar({ product, waLink }) {
   );
   const requiresDeposit = productTotal > HIGH_VALUE_THRESHOLD;
   const depositAmount = requiresDeposit ? Math.round(productTotal * 0.6) : 0;
+
+  function choosePackage(packageId) {
+    setSelectedPackageId(packageId);
+    window.requestAnimationFrame(() => {
+      purchasePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      purchasePanelRef.current?.focus({ preventScroll: true });
+    });
+  }
 
   function onAddToCart() {
     addItem(buildSingleProductCartItem(product, selectedPackage));
@@ -171,7 +246,38 @@ export default function BuyBar({ product, waLink }) {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="space-y-8">
+      {packages.length ? (
+        <div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {packages.map((item) => (
+              <PackageCard
+                key={item.id}
+                item={item}
+                product={product}
+                selected={item.id === selectedPackageId}
+                onSelect={choosePackage}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div
+        ref={purchasePanelRef}
+        id="add-to-cart"
+        tabIndex={-1}
+        className="scroll-mt-24 rounded-3xl border-2 border-amber-300 bg-white p-5 shadow-xl outline-none focus:ring-4 focus:ring-amber-300/40 sm:p-6"
+      >
+      <div className="mb-5 border-b border-slate-200 pb-4">
+        <div className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">Complete your order</div>
+        <h3 className="mt-1 text-2xl font-black text-slate-950">Add to cart</h3>
+        {selectedPackage ? (
+          <div className="mt-3 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900" role="status" aria-live="polite">
+            <span className="font-black">Your selected package:</span> {selectedPackage.name} — {formatCurrency(selectedPackage.price)}
+          </div>
+        ) : null}
+      </div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-sm text-slate-600">
@@ -192,17 +298,17 @@ export default function BuyBar({ product, waLink }) {
           <button
             type="button"
             onClick={onAddToCart}
-            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:opacity-90 cursor-pointer"
+            className="danger-shake rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:opacity-90 cursor-pointer"
           >
-            {added ? "Added" : "Add to cart"}
+            {added ? "Added" : addToCartLabel}
           </button>
 
           <button
             type="button"
             onClick={openCustomerDetailsForm}
-            className="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-900 hover:opacity-90 cursor-pointer"
+            className="danger-shake rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-900 hover:opacity-90 cursor-pointer"
           >
-            WhatsApp to confirm
+            {confirmLabel}
           </button>
         </div>
       </div>
@@ -285,7 +391,7 @@ export default function BuyBar({ product, waLink }) {
                   href={waLink}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center justify-center rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-900 hover:opacity-90"
+                  className="danger-shake inline-flex items-center justify-center rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-900 hover:opacity-90"
                 >
                   Continue on WhatsApp
                 </a>
@@ -393,7 +499,7 @@ export default function BuyBar({ product, waLink }) {
               <button
                 type="submit"
                 disabled={submitting}
-                className="mt-5 w-full rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-900 hover:opacity-90 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                className="danger-shake mt-5 w-full rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-900 hover:opacity-90 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
                 {submitting ? "Submitting order..." : "Submit order request"}
               </button>
@@ -401,6 +507,7 @@ export default function BuyBar({ product, waLink }) {
           )}
         </div>
       ) : null}
+      </div>
     </div>
   );
 }
