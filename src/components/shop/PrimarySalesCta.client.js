@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-export default function PrimarySalesCta({ href }) {
+export default function PrimarySalesCta({ href, label = "Click Here To Grab This Order" }) {
   const ctaRef = useRef(null);
 
   useEffect(() => {
@@ -37,7 +37,7 @@ export default function PrimarySalesCta({ href }) {
         <circle cx="19" cy="20" r="1" />
         <path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L21 8H6" />
       </svg>
-      <span>Click Here To Grab This Order</span>
+      <span>{label}</span>
     </a>
   );
 }

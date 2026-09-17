@@ -80,22 +80,22 @@ function PackageCard({ item, product, selected, onSelect }) {
   const image = item.image_url || getProductImage(product);
 
   return (
-    <article className={`flex h-full flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition ${selected ? "border-orange-500 ring-2 ring-orange-200" : "border-slate-200"}`}>
+    <article className={`flex h-full flex-col overflow-hidden rounded-2xl border bg-white shadow-[0_12px_35px_rgba(15,23,42,0.10)] transition ${selected ? "border-[#374BA5] ring-4 ring-[#374BA5]/15" : "border-slate-200"}`}>
       <div className="relative flex aspect-[16/9] items-center justify-center overflow-hidden bg-slate-100">
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={image} alt={item.name || "Package"} className="h-full w-full object-contain" />
         ) : <span className="text-xs font-semibold text-slate-400">Package image</span>}
-        {item.featured ? <span className="absolute left-3 top-3 rounded-full bg-amber-500 px-2 py-1 text-[10px] font-black uppercase text-slate-950">Recommended</span> : null}
+        {item.featured ? <span className="absolute left-3 top-3 rounded-full bg-red-600 px-3 py-1 text-[10px] font-black uppercase text-white">Recommended</span> : null}
       </div>
       <div className="flex flex-1 flex-col p-4">
         <h3 className="text-xl font-black text-slate-950">{item.name}</h3>
         {savings > 0 ? <div className="mt-2 text-xs font-black uppercase tracking-wide text-red-600">Save — {formatCurrency(savings)}</div> : null}
-        <div className="mt-3 text-3xl font-black text-amber-700">{hasSalePrice ? formatCurrency(salePrice) : "Request price"}</div>
+        <div className="mt-3 text-3xl font-black text-[#374BA5]">{hasSalePrice ? formatCurrency(salePrice) : "Request price"}</div>
         {hasNormalPrice ? <div className={savings > 0 ? "mt-1 text-sm text-slate-500 line-through" : "mt-1 text-sm text-slate-500"}>Normal price — {formatCurrency(normalPrice)}</div> : null}
         {item.description ? <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p> : null}
         {features.length ? <ul className="mt-4 flex-1 space-y-2 text-sm leading-5 text-slate-700">{features.map((feature, index) => <li key={`${feature}-${index}`}>✓ {feature}</li>)}</ul> : <div className="flex-1" />}
-        <button type="button" onClick={() => onSelect(item.id)} aria-pressed={selected} className="mt-5 w-full rounded-xl border-2 border-[#d83b18] bg-[#ff5a2f] px-4 py-3 text-sm font-black text-white shadow-[0_4px_0_#b92f13] hover:bg-[#ff4b20]">{item.cta_text || "I WANT THIS PACKAGE"}</button>
+        <button type="button" onClick={() => onSelect(item.id)} aria-pressed={selected} className="mt-5 w-full rounded-full bg-red-600 px-4 py-3 text-sm font-black uppercase text-white shadow-lg shadow-red-900/20 hover:bg-red-700">{item.cta_text || "I WANT THIS PACKAGE"}</button>
       </div>
     </article>
   );
@@ -249,7 +249,7 @@ export default function BuyBar({
     <div className="space-y-8">
       {packages.length ? (
         <div>
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-6" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 19rem), 1fr))" }}>
             {packages.map((item) => (
               <PackageCard
                 key={item.id}
@@ -267,10 +267,10 @@ export default function BuyBar({
         ref={purchasePanelRef}
         id="add-to-cart"
         tabIndex={-1}
-        className="scroll-mt-24 rounded-3xl border-2 border-amber-300 bg-white p-5 shadow-xl outline-none focus:ring-4 focus:ring-amber-300/40 sm:p-6"
+        className="mx-auto max-w-[745px] scroll-mt-24 rounded-2xl border-2 border-[#374BA5] bg-white p-5 shadow-xl outline-none focus:ring-4 focus:ring-[#374BA5]/20 sm:p-7"
       >
       <div className="mb-5 border-b border-slate-200 pb-4">
-        <div className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">Complete your order</div>
+        <div className="text-xs font-black uppercase tracking-[0.18em] text-[#374BA5]">Complete your order</div>
         <h3 className="mt-1 text-2xl font-black text-slate-950">Add to cart</h3>
         {selectedPackage ? (
           <div className="mt-3 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900" role="status" aria-live="polite">
@@ -283,7 +283,7 @@ export default function BuyBar({
           <div className="text-sm text-slate-600">
             {selectedPackage ? "Selected package price" : "Price"}
           </div>
-          <div className="text-xl font-extrabold text-amber-600">
+          <div className="text-xl font-extrabold text-[#374BA5]">
             {formatCurrency(productTotal)}
           </div>
 
@@ -298,7 +298,7 @@ export default function BuyBar({
           <button
             type="button"
             onClick={onAddToCart}
-            className="danger-shake rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:opacity-90 cursor-pointer"
+            className="danger-shake rounded-full bg-[#374BA5] px-5 py-3 text-sm font-bold text-white hover:bg-[#2d3e8d] cursor-pointer"
           >
             {added ? "Added" : addToCartLabel}
           </button>
@@ -306,7 +306,7 @@ export default function BuyBar({
           <button
             type="button"
             onClick={openCustomerDetailsForm}
-            className="danger-shake rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-900 hover:opacity-90 cursor-pointer"
+            className="danger-shake rounded-full bg-red-600 px-5 py-3 text-sm font-bold text-white hover:bg-red-700 cursor-pointer"
           >
             {confirmLabel}
           </button>

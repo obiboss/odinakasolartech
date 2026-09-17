@@ -19,7 +19,7 @@ export default function ProductGallery({ images = [], name = "" }) {
             src={active}
             alt={name}
             fill
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
             sizes="(max-width: 1024px) 100vw, 60vw"
           />
         ) : (
@@ -35,15 +35,15 @@ export default function ProductGallery({ images = [], name = "" }) {
             <button
               key={u}
               onClick={() => setActive(u)}
-              className="shrink-0 rounded-xl border border-slate-200 bg-white p-1 hover:bg-slate-50 transition cursor-pointer"
+              className="relative h-16 w-20 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 transition hover:bg-slate-50 cursor-pointer"
               aria-label="Select image"
             >
               <Image
                 src={u}
                 alt=""
                 fill
-                className="h-16 w-20 rounded-lg object-cover"
-                sizes="(max-width: 1024px) 100vw, 60vw"
+                className="rounded-lg object-contain"
+                sizes="80px"
               />
             </button>
           ))}

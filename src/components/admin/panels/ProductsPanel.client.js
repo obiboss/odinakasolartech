@@ -8,6 +8,7 @@ import { getStoragePublicUrl } from "@/lib/supabase/storage";
 import { getVideoEmbedUrl } from "@/lib/videoEmbed";
 import ProductSalesContentEditor from "@/components/admin/ProductSalesContentEditor.client";
 import ProductPackageEditor from "@/components/admin/ProductPackageEditor.client";
+import AdminAccordionSection from "@/components/admin/AdminAccordionSection.client";
 import {
   createDefaultSalesPageContent,
   getSalesPageRecord,
@@ -272,7 +273,7 @@ export default function ProductsPanel() {
 
     const imageUrl = getStoragePublicUrl(supabase, "product-images", path);
     if (!imageUrl) {
-      throw new Error("Upload succeeded, but public URL could not be created.");
+      throw new Error("The image uploaded, but could not be prepared for display.");
     }
     return imageUrl;
   }
@@ -292,7 +293,7 @@ export default function ProductsPanel() {
 
     if (!slug) {
       setSaving(false);
-      setErr("URL name is required.");
+      setErr("Page address is required.");
       return;
     }
 
@@ -304,7 +305,7 @@ export default function ProductsPanel() {
       )
     ) {
       setSaving(false);
-      setErr("Enter a valid YouTube or Facebook video URL.");
+      setErr("Enter a valid YouTube or Facebook video link.");
       return;
     }
 
@@ -865,7 +866,7 @@ export default function ProductsPanel() {
                         </div>
 
                         <div className="mt-0.5 text-xs text-slate-500">
-                          URL name:{" "}
+                          Page address:{" "}
                           <span className="font-semibold">{p.slug}</span>
                           {" • "}
                           Price:{" "}
@@ -911,7 +912,9 @@ export default function ProductsPanel() {
                   : "Update the product and upload more images when needed."}
               </div>
 
-              <div className="mt-4 grid gap-3">
+              <div className="mt-4 grid gap-3" key={`${mode}-${editingId || "new"}`}>
+                <AdminAccordionSection title="Main product information">
+                  <div className="grid gap-3">
                 <div>
                   <label className="text-xs text-slate-600">Product name</label>
                   <input
@@ -931,7 +934,7 @@ export default function ProductsPanel() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-600">URL name</label>
+                  <label className="text-xs text-slate-600">Page address</label>
                   <input
                     value={form.urlName}
                     onChange={(e) =>
@@ -992,33 +995,42 @@ export default function ProductsPanel() {
                   />
                 </div>
 
-                <ProductPackageEditor
-                  packages={packages}
-                  onAdd={addPackage}
-                  onUpdate={updatePackage}
-                  onRemove={(id) =>
-                    setPackages((items) =>
-                      items.filter((entry) => entry.id !== id),
-                    )
-                  }
-                  onMove={movePackage}
-                  onError={setErr}
-                />
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={form.featured}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, featured: e.target.checked }))
+                    }
+                    className="h-4 w-4 cursor-pointer"
+                  />
+                  Feature this product on homepage
+                </label>
+                  </div>
+                </AdminAccordionSection>
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <AdminAccordionSection title="Packages" summary={`${packages.length} packages`}>
+                  <ProductPackageEditor
+                    packages={packages}
+                    onAdd={addPackage}
+                    onUpdate={updatePackage}
+                    onRemove={(id) =>
+                      setPackages((items) =>
+                        items.filter((entry) => entry.id !== id),
+                      )
+                    }
+                    onMove={movePackage}
+                    onError={setErr}
+                  />
+                </AdminAccordionSection>
+
+                <AdminAccordionSection title="Basic power list" summary={`${capabilities.length} items`}>
                   <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold">
-                        What Can It Power?
-                      </div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        Add the appliances this product can support.
-                      </div>
-                    </div>
+                    <div className="text-sm font-semibold text-slate-700">Appliances</div>
                     <button
                       type="button"
                       onClick={addCapability}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold hover:bg-slate-100"
+                      className="cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold hover:bg-slate-100"
                     >
                       Add item
                     </button>
@@ -1041,20 +1053,17 @@ export default function ProductsPanel() {
                               items.filter((entry) => entry.id !== item.id),
                             )
                           }
-                          className="rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700"
+                          className="cursor-pointer rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
                         >
                           Remove
                         </button>
                       </div>
                     ))}
                   </div>
-                </div>
+                </AdminAccordionSection>
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-sm font-semibold">
-                    Client video testimonial
-                  </div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-[10rem,1fr]">
+                <AdminAccordionSection title="Main customer video" summary={form.video_testimonial_url ? "1 video" : "No video"}>
+                  <div className="grid gap-2 sm:grid-cols-[10rem,1fr]">
                     <select
                       value={form.video_testimonial_platform}
                       onChange={(e) =>
@@ -1077,28 +1086,17 @@ export default function ProductsPanel() {
                           video_testimonial_url: e.target.value,
                         }))
                       }
-                      placeholder="YouTube or Facebook video URL"
+                      placeholder="Paste video link"
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
                     />
                   </div>
-                </div>
+                </AdminAccordionSection>
 
                 <ProductSalesContentEditor
                   value={salesPageContent}
                   onChange={setSalesPageContent}
+                  productImages={images}
                 />
-
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={form.featured}
-                    onChange={(e) =>
-                      setForm((s) => ({ ...s, featured: e.target.checked }))
-                    }
-                    className="h-4 w-4"
-                  />
-                  Feature this product on homepage
-                </label>
 
                 <button
                   disabled={saving || uploading}
@@ -1121,16 +1119,9 @@ export default function ProductsPanel() {
           </div>
 
           <div className="lg:col-span-5">
-            <div className="rounded-2xl border border-slate-200 bg-white/90 p-4">
+            <AdminAccordionSection title="Product images" summary={`${allPreviewThumbs.length} images`} className="bg-white/90">
               <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold">Images</div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    {mode === "new"
-                      ? "Select images now. They will upload when you save the product."
-                      : "Select images now and upload them immediately, or save them together with other changes."}
-                  </div>
-                </div>
+                <div className="text-sm text-slate-600">Add clear photos of this product.</div>
 
                 {mode === "edit" && pendingFiles.length > 0 ? (
                   <button
@@ -1206,7 +1197,7 @@ export default function ProductsPanel() {
                       <button
                         type="button"
                         onClick={() => removeImage(img)}
-                        className="absolute right-2 top-2 rounded-xl border border-red-500/25 bg-red-500/10 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-500/15"
+                        className="absolute right-2 top-2 cursor-pointer rounded-xl border border-red-500/25 bg-red-500/10 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                       >
                         Remove
                       </button>
@@ -1214,7 +1205,7 @@ export default function ProductsPanel() {
                       <button
                         type="button"
                         onClick={() => removePendingFile(img.id)}
-                        className="absolute right-2 top-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-500/15"
+                        className="absolute right-2 top-2 cursor-pointer rounded-xl border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                       >
                         Remove
                       </button>
@@ -1222,14 +1213,8 @@ export default function ProductsPanel() {
                   </div>
                 ))}
               </div>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-900">
-              <div className="font-semibold">Photo tip</div>
-              <div className="mt-1 text-xs text-amber-800">
-                Use clean lighting and 4:3 product photos for best results.
-              </div>
-            </div>
+              <div className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-900">Use clean lighting and 4:3 product photos for best results.</div>
+            </AdminAccordionSection>
           </div>
         </div>
       )}

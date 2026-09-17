@@ -83,13 +83,13 @@ function PackagePreview({ item }) {
 export default function ProductPackageEditor({ packages, onAdd, onUpdate, onRemove, onMove, onError }) {
   const listInputRefs = useRef({});
   const previousIdsRef = useRef(packages.map((item) => item.id));
-  const [openPackageId, setOpenPackageId] = useState(packages[0]?.id || "");
+  const [openPackageId, setOpenPackageId] = useState("");
 
   useEffect(() => {
     const previousIds = new Set(previousIdsRef.current);
     const addedPackage = packages.find((item) => !previousIds.has(item.id));
     if (addedPackage) setOpenPackageId(addedPackage.id);
-    else if (openPackageId && !packages.some((item) => item.id === openPackageId)) setOpenPackageId(packages[0]?.id || "");
+    else if (openPackageId && !packages.some((item) => item.id === openPackageId)) setOpenPackageId("");
     previousIdsRef.current = packages.map((item) => item.id);
   }, [packages, openPackageId]);
 
@@ -151,7 +151,7 @@ export default function ProductPackageEditor({ packages, onAdd, onUpdate, onRemo
               <button
                 type="button"
                 onClick={() => removeListItem(item.id, field, index)}
-                className="shrink-0 rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700"
+                className="shrink-0 cursor-pointer rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
               >
                 Remove
               </button>
@@ -161,7 +161,7 @@ export default function ProductPackageEditor({ packages, onAdd, onUpdate, onRemo
         <button
           type="button"
           onClick={() => addListItem(item.id, field, items.length - 1)}
-          className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+          className="cursor-pointer rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100"
         >
           + Add {label}
         </button>
@@ -202,19 +202,11 @@ export default function ProductPackageEditor({ packages, onAdd, onUpdate, onRemo
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <div>
-        <div>
-          <div className="text-sm font-semibold">Packages</div>
-          <div className="mt-1 text-xs text-slate-500">Each package can have its own image, sale pricing, benefits, terms, and customer CTA.</div>
-        </div>
-      </div>
-
-      <div className="mt-3 space-y-4">
+    <div className="space-y-4">
         {!packages.length ? (
           <div className="rounded-2xl border border-dashed border-amber-300 bg-white p-6 text-center">
             <p className="text-sm text-slate-600">Add the first way customers can buy this product.</p>
-            <button type="button" onClick={onAdd} className="mt-3 rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-slate-950">+ Add Package</button>
+            <button type="button" onClick={onAdd} className="mt-3 cursor-pointer rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-slate-950">+ Add Package</button>
           </div>
         ) : null}
         {packages.map((item, index) => {
@@ -225,7 +217,7 @@ export default function ProductPackageEditor({ packages, onAdd, onUpdate, onRemo
 
           return (
             <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-              <button type="button" onClick={() => setOpenPackageId(openPackageId === item.id ? "" : item.id)} className="flex w-full items-center justify-between gap-4 text-left">
+              <button type="button" onClick={() => setOpenPackageId(openPackageId === item.id ? "" : item.id)} className="flex min-h-12 w-full cursor-pointer items-center justify-between gap-4 rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">
                 <span><span className="block text-xs font-black uppercase tracking-wider text-amber-700">Package {index + 1}</span><span className="mt-1 block font-black text-slate-950">{item.name || "Untitled package"}</span><span className="mt-1 block text-xs text-slate-500">{sale !== null ? formatCurrency(sale) : "Price not set"} · {item.active === false ? "Hidden" : "Active"}</span></span>
                 <span className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold">{openPackageId === item.id ? "Collapse" : "Edit"}</span>
               </button>
@@ -264,14 +256,14 @@ export default function ProductPackageEditor({ packages, onAdd, onUpdate, onRemo
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-700">
-                    <label className="inline-flex items-center gap-2"><input type="checkbox" checked={item.featured === true} onChange={(event) => onUpdate(item.id, { featured: event.target.checked })} className="h-4 w-4" /> Featured / recommended</label>
-                    <label className="inline-flex items-center gap-2"><input type="checkbox" checked={item.active !== false} onChange={(event) => onUpdate(item.id, { active: event.target.checked })} className="h-4 w-4" /> Active</label>
+                    <label className="inline-flex cursor-pointer items-center gap-2"><input type="checkbox" checked={item.featured === true} onChange={(event) => onUpdate(item.id, { featured: event.target.checked })} className="h-4 w-4 cursor-pointer" /> Featured / recommended</label>
+                    <label className="inline-flex cursor-pointer items-center gap-2"><input type="checkbox" checked={item.active !== false} onChange={(event) => onUpdate(item.id, { active: event.target.checked })} className="h-4 w-4 cursor-pointer" /> Active</label>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={() => onMove(item.id, -1)} disabled={index === 0} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold disabled:opacity-40">Move up</button>
-                    <button type="button" onClick={() => onMove(item.id, 1)} disabled={index === packages.length - 1} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold disabled:opacity-40">Move down</button>
-                    <button type="button" onClick={() => removePackage(item)} className="rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700">Remove package</button>
+                    <button type="button" onClick={() => onMove(item.id, -1)} disabled={index === 0} className="cursor-pointer rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">Move up</button>
+                    <button type="button" onClick={() => onMove(item.id, 1)} disabled={index === packages.length - 1} className="cursor-pointer rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">Move down</button>
+                    <button type="button" onClick={() => removePackage(item)} className="cursor-pointer rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50">Remove package</button>
                   </div>
                 </div>
 
@@ -284,9 +276,9 @@ export default function ProductPackageEditor({ packages, onAdd, onUpdate, onRemo
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <label className="cursor-pointer rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100">{image ? "Replace image" : "Upload image"}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => selectImage(item.id, event)} className="sr-only" /></label>
-                    {image ? <button type="button" onClick={() => removeImage(item)} className="rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700">Remove image</button> : null}
+                    {image ? <button type="button" onClick={() => removeImage(item)} className="cursor-pointer rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50">Remove image</button> : null}
                   </div>
-                  <p className="text-[11px] leading-5 text-slate-500">PNG, JPG, JPEG, or WEBP. Maximum 5MB. Images use the existing product image storage bucket.</p>
+                  <p className="text-[11px] leading-5 text-slate-500">PNG, JPG, JPEG, or WEBP. Maximum 5MB.</p>
                   <PackagePreview item={item} />
                 </div>
               </div>
@@ -294,8 +286,7 @@ export default function ProductPackageEditor({ packages, onAdd, onUpdate, onRemo
             </div>
           );
         })}
-        {packages.length ? <button type="button" onClick={onAdd} className="w-full rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 px-4 py-4 text-sm font-black text-amber-950 hover:bg-amber-100">+ Add Another Package</button> : null}
-      </div>
+        {packages.length ? <button type="button" onClick={onAdd} className="w-full cursor-pointer rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 px-4 py-4 text-sm font-black text-amber-950 hover:bg-amber-100">+ Add Another Package</button> : null}
     </div>
   );
 }
