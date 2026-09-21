@@ -95,6 +95,7 @@ export default function ProductsPanel() {
   const [salesPageContent, setSalesPageContent] = useState(
     createDefaultSalesPageContent(),
   );
+  const [salesPageUploadOwnerId, setSalesPageUploadOwnerId] = useState(() => safeId());
 
   const editingProduct = useMemo(
     () => products.find((p) => p.id === editingId) || null,
@@ -182,6 +183,7 @@ export default function ProductsPanel() {
     setPackages([]);
     setCapabilities([]);
     setSalesPageContent(createDefaultSalesPageContent());
+    setSalesPageUploadOwnerId(safeId());
     setForm({
       name: "",
       urlName: "",
@@ -209,6 +211,7 @@ export default function ProductsPanel() {
     setSalesPageContent(
       normalizeSalesPageContent(salesPage?.content),
     );
+    setSalesPageUploadOwnerId(p.id);
     setForm({
       name: p.name || "",
       urlName: p.slug || "",
@@ -276,6 +279,18 @@ export default function ProductsPanel() {
       throw new Error("The image uploaded, but could not be prepared for display.");
     }
     return imageUrl;
+  }
+
+  async function uploadEducationImage(file) {
+    setUploading(true);
+    try {
+      return await uploadFileToProductStorage(
+        editingId || salesPageUploadOwnerId,
+        file,
+      );
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function saveProduct() {
@@ -1096,6 +1111,7 @@ export default function ProductsPanel() {
                   value={salesPageContent}
                   onChange={setSalesPageContent}
                   productImages={images}
+                  onUploadEducationImage={uploadEducationImage}
                 />
 
                 <button

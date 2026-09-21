@@ -1,11 +1,12 @@
+/* eslint-disable @next/next/no-img-element -- the education image must keep its source aspect ratio without a fixed frame */
 import Image from "next/image";
 import ProductGallery from "@/components/shop/ProductGallery.client";
 import BuyBar from "@/components/shop/BuyBar.client";
 import UrgencyCountdown from "@/components/shop/UrgencyCountdown.client";
 import PrimarySalesCta from "@/components/shop/PrimarySalesCta.client";
+import ProductFaqAccordion from "@/components/shop/ProductFaqAccordion.client";
 import ProductReviews from "@/components/shop/ProductReviews.server";
 import { formatCurrency } from "@/lib/formatCurrency";
-import { whatsappLink } from "@/lib/whatsapp";
 import { getVideoEmbedUrl } from "@/lib/videoEmbed";
 import {
   hasRepeatableContent,
@@ -37,7 +38,7 @@ function Heading({ eyebrow, title, children, dark = false, align = "center" }) {
 }
 
 function ActionLink({ href, children, className = "" }) {
-  return <a href={href} className={cx("danger-shake inline-flex items-center justify-center rounded-full bg-red-600 px-7 py-3 text-center text-sm font-black uppercase text-white shadow-lg shadow-red-900/20 transition hover:bg-red-700", className)}>{children}</a>;
+  return <a href={href} style={{ color: "#fff" }} className={cx("danger-shake inline-flex items-center justify-center rounded-full bg-red-600 px-7 py-3 text-center text-sm font-black uppercase text-white shadow-lg shadow-red-900/20 transition visited:text-white hover:bg-red-700 hover:text-white focus-visible:text-white active:text-white", className)}>{children}</a>;
 }
 
 function RepeatableCards({ items, className = "", render }) {
@@ -84,6 +85,16 @@ function FormattedContent({ value }) {
   });
 }
 
+function FooterInfoColumn({ heading, body }) {
+  if (!hasText(heading) && !hasText(body)) return null;
+  return (
+    <div className="min-w-0">
+      {hasText(heading) ? <h2 className="text-xl font-black text-white">{heading}</h2> : null}
+      {hasText(body) ? <div className="mt-3 space-y-3 [&_li>span:first-child]:!text-emerald-300 [&_p]:!text-sm [&_p]:!leading-7 [&_p]:!text-slate-100 [&_strong]:!text-white [&_ul]:!text-sm [&_ul]:!leading-7 [&_ul]:!text-slate-100"><FormattedContent value={body} /></div> : null}
+    </div>
+  );
+}
+
 function VideoBlock({ embeds, content }) {
   if (!embeds.length) return null;
   const video = content.video || {};
@@ -125,20 +136,36 @@ export default function ProductSalesPage({ product, waLink, videoEmbed, approved
   const hasBonuses = content.bonuses.enabled && (hasText(content.bonuses.heading) || hasText(content.bonuses.intro) || hasText(content.bonuses.image_url) || hasText(content.bonuses.note) || hasText(content.bonuses.progress_text) || hasText(content.bonuses.progress_percent) || hasRepeatableContent(content.bonuses.items));
   const hasProblem = content.problem.enabled && (hasText(content.problem.image_url) || hasText(content.problem.content));
   const hasBenefits = content.benefits.enabled && (hasText(content.benefits.heading) || hasText(content.benefits.content));
-  const hasEducation = content.education.enabled && (hasText(content.education.heading) || hasText(content.education.intro) || hasRepeatableContent(content.education.blocks));
+  const legacyEducationContent = [
+    content.education.intro,
+    ...(content.education.blocks || []).flatMap((item) => [item.title || item.name, item.body || item.description].filter(hasText)),
+  ].filter(hasText).join("\n\n");
+  const educationContent = hasText(content.education.content) ? content.education.content : legacyEducationContent;
+  const hasEducation = content.education.enabled && (hasText(content.education.heading) || hasText(content.education.image_url) || hasText(educationContent) || hasText(content.education.button_text));
   const hasSteps = content.how_it_works.enabled && (hasText(content.how_it_works.heading) || hasRepeatableContent(content.how_it_works.steps));
   const packageContent = content.packages || {};
   const packageHeading = packageContent.enabled && hasText(packageContent.heading) ? packageContent.heading : "Choose your package";
   const packageIntro = packageContent.enabled && hasText(packageContent.intro) ? packageContent.intro : "";
-  const hasDelivery = content.delivery.enabled && (hasText(content.delivery.heading) || hasText(content.delivery.body) || hasRepeatableContent(content.delivery.points));
+  const legacyDeliveryContent = [
+    content.delivery.body,
+    ...(content.delivery.points || []).map((item) => item.title || item.name).filter(hasText).map((item) => `- ${item}`),
+  ].filter(hasText).join("\n\n");
+  const deliveryContent = hasText(content.delivery.content) ? content.delivery.content : legacyDeliveryContent;
+  const hasDelivery = content.delivery.enabled && (hasText(content.delivery.heading) || hasText(deliveryContent) || hasText(content.delivery.button_text) || hasText(content.delivery.text_below));
   const hasFaq = content.faq.enabled && (hasText(content.faq.heading) || hasRepeatableContent(content.faq.items));
   const hasFinalCta = content.final_cta.enabled && (hasText(content.final_cta.heading) || hasText(content.final_cta.body));
   const hasGuarantee = content.guarantee.enabled && (hasText(content.guarantee.heading) || hasText(content.guarantee.body));
   const hasShipping = content.shipping.enabled && (hasText(content.shipping.heading) || hasText(content.shipping.body));
-  const hasContact = content.contact.enabled && (hasText(content.contact.heading) || hasText(content.contact.body) || hasText(content.contact.phone) || hasText(content.contact.whatsapp));
-  const customContactLink = hasText(content.contact.whatsapp)
-    ? whatsappLink({ phone: content.contact.whatsapp, message: `Hello, I want to buy ${product.name}.` })
-    : waLink;
+  const hasContact = content.contact.enabled && (hasText(content.contact.number_heading) || hasText(content.contact.heading) || hasText(content.contact.body) || hasText(content.contact.phone) || hasText(content.contact.whatsapp));
+  const contactNumber = content.contact.phone || content.contact.whatsapp;
+  const hasFooterColumns = hasGuarantee || hasShipping || (hasContact && (hasText(content.contact.heading) || hasText(content.contact.body)));
+  const productFaqs = hasFaq
+    ? (content.faq.items || []).filter((item) => hasText(item.question) && hasText(item.answer))
+    : [
+        { id: "availability", question: `Is ${product.name} available in Nigeria?`, answer: product.in_stock === false ? "Please contact Odinaka Solar Tech to confirm restock timing." : `Yes, ${product.name} is currently available from Odinaka Solar Tech in Nigeria.` },
+        { id: "price", question: `How much is ${product.name}?`, answer: packages.length ? "Choose a package above to see its current price." : product.price != null ? `${formatCurrency(product.price)}.` : "Please contact us to confirm the current price." },
+        { id: "order", question: `How can I order ${product.name}?`, answer: "Use the order options on this page, or contact Odinaka Solar Tech through WhatsApp." },
+      ];
 
   return (
     <div className="-mx-4 sm:-mx-6">
@@ -182,7 +209,12 @@ export default function ProductSalesPage({ product, waLink, videoEmbed, approved
 
       {hasBenefits ? <Section>{hasText(content.benefits.heading) ? <Heading title={content.benefits.heading} /> : null}<div className={cx("mx-auto max-w-3xl space-y-5", hasText(content.benefits.heading) && "mt-8")}><FormattedContent value={content.benefits.content} /></div></Section> : null}
 
-      {hasEducation ? <Section><Heading title={content.education.heading}>{content.education.intro}</Heading><RepeatableCards items={content.education.blocks} className="lg:grid-cols-2" render={(item, index) => <article key={item.id || index} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><h3 className="text-xl font-black text-slate-950">{item.title || item.name}</h3><p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-700">{item.body || item.description}</p></article>} /></Section> : null}
+      {hasEducation ? <Section cta={false}>
+        {hasText(content.education.heading) ? <Heading title={content.education.heading} /> : null}
+        {hasText(content.education.image_url) ? <div className="mx-auto mt-8 w-full max-w-4xl"><img src={content.education.image_url} alt={content.education.heading || product.name} loading="lazy" decoding="async" className="mx-auto block h-auto max-w-full" /></div> : null}
+        {hasText(educationContent) ? <div className="mx-auto mt-8 max-w-3xl space-y-5"><FormattedContent value={educationContent} /></div> : null}
+        {hasText(content.education.button_text) ? <div className="mt-8 flex justify-center"><PrimarySalesCta href="#purchase" label={content.education.button_text} /></div> : null}
+      </Section> : null}
 
       {product.specs ? <Section><Heading title={`${product.name} specifications`} /><dl className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{Object.entries(product.specs).map(([key, value]) => <div key={key} className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><dt className="text-xs font-black uppercase tracking-wide text-slate-500">{key.replace(/_/g, " ")}</dt><dd className="mt-2 font-bold text-slate-950">{String(value)}</dd></div>)}</dl></Section> : null}
 
@@ -192,14 +224,27 @@ export default function ProductSalesPage({ product, waLink, videoEmbed, approved
 
       <Section id="purchase" className="bg-white"><Heading title={packages.length ? packageHeading : product.name}>{packages.length ? packageIntro : null}</Heading><div className="mt-8"><BuyBar product={{ ...product, packages }} waLink={waLink} /></div></Section>
 
-      {hasDelivery ? <Section><div className="mx-auto max-w-4xl rounded-2xl border-2 border-red-500 bg-red-50 p-6 sm:p-8"><Heading title={content.delivery.heading}>{content.delivery.body}</Heading><RepeatableCards items={content.delivery.points} render={(item, index) => <div key={item.id || index} className="rounded-xl bg-white p-4 text-sm font-semibold leading-6 text-slate-700 shadow-sm">✓ {item.title || item.name}</div>} /></div></Section> : null}
+      {hasDelivery ? <Section cta={false}>
+        {hasText(content.delivery.heading) ? <div className="text-center"><h2 className="text-[clamp(1.9rem,4vw,3.25rem)] font-black leading-[1.08] tracking-tight text-red-600">{content.delivery.heading}</h2></div> : null}
+        {hasText(deliveryContent) ? <div className="mx-auto mt-8 max-w-3xl rounded-2xl bg-slate-950 px-5 py-7 text-white shadow-xl sm:px-9 sm:py-9"><div className="space-y-5 [&_p]:!text-white [&_strong]:!text-white [&_ul]:!text-white [&_li>span:first-child]:!text-amber-400"><FormattedContent value={deliveryContent} /></div></div> : null}
+        {hasText(content.delivery.button_text) ? <div className="mt-7 flex justify-center"><PrimarySalesCta href="#purchase" label={content.delivery.button_text} /></div> : null}
+        {hasText(content.delivery.text_below) ? <p className="mx-auto mt-4 max-w-2xl text-center text-sm font-bold uppercase tracking-wide text-slate-700">{content.delivery.text_below}</p> : null}
+      </Section> : null}
 
-      <Section><Heading title={hasFaq ? content.faq.heading : "Frequently asked questions"} /><div className="mt-8 space-y-3">{hasFaq ? (content.faq.items || []).filter((item) => hasText(item.question) || hasText(item.answer)).map((item, index) => <details key={item.id || index} className="rounded-2xl border border-slate-200 bg-white p-5"><summary className="cursor-pointer font-black text-slate-950">{item.question}</summary><p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-700">{item.answer}</p></details>) : null}<details className="rounded-2xl border border-slate-200 bg-white p-5"><summary className="cursor-pointer font-black text-slate-950">Is {product.name} available in Nigeria?</summary><p className="mt-3 text-sm leading-7 text-slate-700">{product.in_stock === false ? `Please contact Odinaka Solar Tech to confirm restock timing.` : `Yes, ${product.name} is currently available from Odinaka Solar Tech in Nigeria.`}</p></details><details className="rounded-2xl border border-slate-200 bg-white p-5"><summary className="cursor-pointer font-black text-slate-950">How much is {product.name}?</summary><p className="mt-3 text-sm leading-7 text-slate-700">{packages.length ? "Choose a package above to see its current price." : product.price != null ? `${formatCurrency(product.price)}.` : "Please contact us to confirm the current price."}</p></details><details className="rounded-2xl border border-slate-200 bg-white p-5"><summary className="cursor-pointer font-black text-slate-950">How can I order {product.name}?</summary><p className="mt-3 text-sm leading-7 text-slate-700">Use the order options on this page, or contact Odinaka Solar Tech through WhatsApp.</p></details></div></Section>
+      {productFaqs.length ? <Section><Heading title={hasFaq && hasText(content.faq.heading) ? content.faq.heading : "Frequently asked questions"} /><ProductFaqAccordion items={productFaqs} /></Section> : null}
 
       {hasFinalCta ? <Section dark><div className="text-center"><Heading dark title={content.final_cta.heading}>{content.final_cta.body}</Heading></div></Section> : null}
-      {hasGuarantee ? <Section className="bg-amber-50"><Heading title={content.guarantee.heading}>{content.guarantee.body}</Heading></Section> : null}
-      {hasShipping ? <Section><Heading title={content.shipping.heading}>{content.shipping.body}</Heading></Section> : null}
-      {hasContact ? <Section className="bg-slate-50"><div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><Heading title={content.contact.heading}>{content.contact.body}</Heading><div className="flex flex-wrap gap-3">{hasText(content.contact.phone) ? <a href={`tel:${content.contact.phone}`} className="rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-800">Call {content.contact.phone}</a> : null}<ActionLink href={customContactLink}>WhatsApp us</ActionLink></div></div></Section> : null}
+      {hasGuarantee || hasShipping || hasContact ? <Section dark cta={false} className="!bg-black">
+        {hasContact && (hasText(content.contact.number_heading) || hasText(contactNumber)) ? <div className="text-center">
+          {hasText(content.contact.number_heading) ? <div className="text-sm font-black uppercase tracking-[0.16em] text-emerald-300">{content.contact.number_heading}</div> : null}
+          {hasText(contactNumber) ? <a href={`tel:${contactNumber}`} className="mt-2 inline-block text-2xl font-black tracking-tight text-white transition hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-4 focus-visible:ring-offset-black sm:text-3xl">{contactNumber}</a> : null}
+        </div> : null}
+        {hasFooterColumns ? <div className={cx("grid gap-8 md:grid-cols-3 md:gap-10", hasContact && (hasText(content.contact.number_heading) || hasText(contactNumber)) && "mt-9 border-t border-white/20 pt-9")}>
+          {hasGuarantee ? <FooterInfoColumn heading={content.guarantee.heading} body={content.guarantee.body} /> : null}
+          {hasShipping ? <FooterInfoColumn heading={content.shipping.heading} body={content.shipping.body} /> : null}
+          {hasContact ? <FooterInfoColumn heading={content.contact.heading} body={content.contact.body} /> : null}
+        </div> : null}
+      </Section> : null}
       <CustomerReviews reviews={approvedReviews} productId={product.id} />
     </div>
   );

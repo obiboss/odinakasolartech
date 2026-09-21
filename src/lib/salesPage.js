@@ -73,6 +73,9 @@ export function createDefaultSalesPageContent() {
     education: {
       enabled: false,
       heading: "",
+      image_url: "",
+      content: "",
+      button_text: "",
       intro: "",
       blocks: [item("education-1")],
     },
@@ -93,12 +96,20 @@ export function createDefaultSalesPageContent() {
       heading: "",
       intro: "",
     },
-    delivery: { enabled: false, heading: "", body: "", points: [item("delivery-1")] },
+    delivery: {
+      enabled: false,
+      heading: "",
+      content: "",
+      button_text: "",
+      text_below: "",
+      body: "",
+      points: [item("delivery-1")],
+    },
     faq: { enabled: false, heading: "", items: [item("faq-1")] },
     final_cta: { enabled: false, heading: "", body: "", label: "" },
     guarantee: { enabled: false, heading: "", body: "" },
     shipping: { enabled: false, heading: "", body: "" },
-    contact: { enabled: false, heading: "", body: "", phone: "", whatsapp: "" },
+    contact: { enabled: false, number_heading: "", heading: "", body: "", phone: "", whatsapp: "" },
   };
 }
 

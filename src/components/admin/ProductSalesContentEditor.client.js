@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- local blob previews are not compatible with next/image */
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import ProductImageSelector from "@/components/admin/ProductImageSelector.client";
 import AdminAccordionSection from "@/components/admin/AdminAccordionSection.client";
 
@@ -58,6 +58,66 @@ function SimpleFormattedTextEditor({ value, onChange }) {
   );
 }
 
+function EducationImageUpload({ value, onChange, onUpload }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function selectImage(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setError("Choose a PNG, JPG, JPEG, or WEBP image.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Choose an image smaller than 5 MB.");
+      return;
+    }
+
+    setError("");
+    setUploading(true);
+    try {
+      const uploadedUrl = await onUpload(file);
+      if (!uploadedUrl) throw new Error("Missing uploaded image URL.");
+      onChange(uploadedUrl);
+    } catch {
+      setError("The image could not be uploaded. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const triggerClass = `inline-flex min-h-11 items-center justify-center rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-950 transition hover:bg-amber-100 focus-within:ring-2 focus-within:ring-amber-500 focus-within:ring-offset-2 ${uploading ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`;
+
+  return (
+    <div>
+      <div className="text-xs font-semibold text-slate-700">Section image</div>
+      {value ? (
+        <div className="mt-2">
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-2">
+            <img src={value} alt="Product education preview" className="mx-auto block h-auto max-h-80 max-w-full object-contain" />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <label className={triggerClass}>
+              {uploading ? "Uploading..." : "Change image"}
+              <input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={selectImage} className="sr-only" />
+            </label>
+            <button type="button" disabled={uploading} onClick={() => { setError(""); onChange(""); }} className="min-h-11 cursor-pointer rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60">Remove</button>
+          </div>
+        </div>
+      ) : (
+        <label className={`${triggerClass} mt-2 w-full border-dashed py-5`}>
+          {uploading ? "Uploading..." : "+ Choose image"}
+          <input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={selectImage} className="sr-only" />
+        </label>
+      )}
+      {error ? <p role="alert" className="mt-2 text-xs font-semibold text-red-700">{error}</p> : null}
+    </div>
+  );
+}
+
 function Section({ title, summary, enabled, onToggle, children }) {
   const status = [summary, enabled ? "Visible" : "Hidden"].filter(Boolean).join(" • ");
   return (
@@ -86,7 +146,7 @@ function AddRemove({ onAdd, addLabel = "Add another" }) {
   );
 }
 
-export default function ProductSalesContentEditor({ value, onChange, productImages = [] }) {
+export default function ProductSalesContentEditor({ value, onChange, productImages = [], onUploadEducationImage }) {
   const content = value || {};
   const section = (key) => content[key] || {};
 
@@ -224,8 +284,9 @@ export default function ProductSalesContentEditor({ value, onChange, productImag
 
       <Section title="Product education" help="Explain important product features in simple language." enabled={!!section("education").enabled} onToggle={(enabled) => updateSection("education", { enabled })}>
         <Field label="Heading"><input value={section("education").heading || ""} onChange={(event) => updateSection("education", { heading: event.target.value })} placeholder="Enter heading" className={inputClass()} /></Field>
-        <Field label="Paragraph"><textarea value={section("education").intro || ""} onChange={(event) => updateSection("education", { intro: event.target.value })} placeholder="Enter paragraph" className={textareaClass()} /></Field>
-        {renderItems("education", "blocks", [{ key: "title", label: "Topic", placeholder: "Enter topic" }, { key: "body", label: "Explanation", placeholder: "Enter explanation", multiline: true }], "education", "Add topic")}
+        <EducationImageUpload value={section("education").image_url || ""} onUpload={onUploadEducationImage} onChange={(imageUrl) => updateSectionImage("education", imageUrl)} />
+        <Field label="Main content"><SimpleFormattedTextEditor value={section("education").content || ""} onChange={(contentValue) => updateSection("education", { content: contentValue })} /></Field>
+        <Field label="Button text"><input value={section("education").button_text || ""} onChange={(event) => updateSection("education", { button_text: event.target.value })} placeholder="Enter button text" className={inputClass()} /></Field>
       </Section>
 
       <Section title="How it works" help="Describe the customer journey from order to delivery or installation." enabled={!!section("how_it_works").enabled} onToggle={(enabled) => updateSection("how_it_works", { enabled })}>
@@ -258,10 +319,11 @@ export default function ProductSalesContentEditor({ value, onChange, productImag
         </div>
       </Section>
 
-      <Section title="Delivery and purchase information" help="Tell customers what to expect before they order." enabled={!!section("delivery").enabled} onToggle={(enabled) => updateSection("delivery", { enabled })}>
+      <Section title="Order information" help="Show product-specific delivery or payment information before the order form." enabled={!!section("delivery").enabled} onToggle={(enabled) => updateSection("delivery", { enabled })}>
         <Field label="Heading"><input value={section("delivery").heading || ""} onChange={(event) => updateSection("delivery", { heading: event.target.value })} placeholder="Enter heading" className={inputClass()} /></Field>
-        <Field label="Description"><textarea value={section("delivery").body || ""} onChange={(event) => updateSection("delivery", { body: event.target.value })} placeholder="Enter description" className={textareaClass()} /></Field>
-        {renderItems("delivery", "points", [{ key: "title", label: "Item", placeholder: "Enter item" }], "delivery", "Add item")}
+        <Field label="Notice text"><SimpleFormattedTextEditor value={section("delivery").content || ""} onChange={(contentValue) => updateSection("delivery", { content: contentValue })} /></Field>
+        <Field label="Button text"><input value={section("delivery").button_text || ""} onChange={(event) => updateSection("delivery", { button_text: event.target.value })} placeholder="Enter button text" className={inputClass()} /></Field>
+        <Field label="Text below button"><input value={section("delivery").text_below || ""} onChange={(event) => updateSection("delivery", { text_below: event.target.value })} placeholder="Enter text" className={inputClass()} /></Field>
       </Section>
 
       <Section title="Frequently asked questions" summary={`${section("faq").items?.length || 0} questions`} help="Add the questions customers ask most often about this product." enabled={!!section("faq").enabled} onToggle={(enabled) => updateSection("faq", { enabled })}>
@@ -274,23 +336,21 @@ export default function ProductSalesContentEditor({ value, onChange, productImag
         <Field label="Paragraph"><textarea value={section("final_cta").body || ""} onChange={(event) => updateSection("final_cta", { body: event.target.value })} placeholder="Enter paragraph" className={textareaClass()} /></Field>
       </Section>
 
-      <Section title="Guarantee and warranty" help="Only publish warranty or guarantee information that Odinaka actually provides." enabled={!!section("guarantee").enabled} onToggle={(enabled) => updateSection("guarantee", { enabled })}>
-        <Field label="Heading"><input value={section("guarantee").heading || ""} onChange={(event) => updateSection("guarantee", { heading: event.target.value })} placeholder="Enter heading" className={inputClass()} /></Field>
-        <Field label="Details"><textarea value={section("guarantee").body || ""} onChange={(event) => updateSection("guarantee", { body: event.target.value })} placeholder="Enter details" className={textareaClass()} /></Field>
-      </Section>
-
-      <Section title="Shipping" help="Add product-specific shipping information when it differs from the normal store policy." enabled={!!section("shipping").enabled} onToggle={(enabled) => updateSection("shipping", { enabled })}>
-        <Field label="Heading"><input value={section("shipping").heading || ""} onChange={(event) => updateSection("shipping", { heading: event.target.value })} placeholder="Enter heading" className={inputClass()} /></Field>
-        <Field label="Details"><textarea value={section("shipping").body || ""} onChange={(event) => updateSection("shipping", { body: event.target.value })} placeholder="Enter details" className={textareaClass()} /></Field>
-      </Section>
-
-      <Section title="Product-specific contact" help="Leave this off to use the normal Odinaka contact details." enabled={!!section("contact").enabled} onToggle={(enabled) => updateSection("contact", { enabled })}>
-        <Field label="Heading"><input value={section("contact").heading || ""} onChange={(event) => updateSection("contact", { heading: event.target.value })} placeholder="Enter heading" className={inputClass()} /></Field>
-        <Field label="Message"><textarea value={section("contact").body || ""} onChange={(event) => updateSection("contact", { body: event.target.value })} placeholder="Enter message" className={textareaClass()} /></Field>
+      <Section title="Guarantee, shipping & contact" help="Add information that applies specifically to this product page. Global footer content remains managed by the site." enabled={!!(section("guarantee").enabled || section("shipping").enabled || section("contact").enabled)} onToggle={(enabled) => {
+        updateSection("guarantee", { enabled });
+        updateSection("shipping", { enabled });
+        updateSection("contact", { enabled });
+      }}>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Phone"><input value={section("contact").phone || ""} onChange={(event) => updateSection("contact", { phone: event.target.value })} placeholder="Leave blank for store phone" className={inputClass()} /></Field>
-          <Field label="WhatsApp number"><input value={section("contact").whatsapp || ""} onChange={(event) => updateSection("contact", { whatsapp: event.target.value })} placeholder="Leave blank for store WhatsApp" className={inputClass()} /></Field>
+          <Field label="Contact heading"><input value={section("contact").number_heading || ""} onChange={(event) => updateSection("contact", { number_heading: event.target.value })} placeholder="Enter heading" className={inputClass()} /></Field>
+          <Field label="Contact number"><input value={section("contact").phone || ""} onChange={(event) => updateSection("contact", { phone: event.target.value })} placeholder="Enter phone number" className={inputClass()} /></Field>
         </div>
+        <Field label="Guarantee heading"><input value={section("guarantee").heading || ""} onChange={(event) => updateSection("guarantee", { heading: event.target.value })} placeholder="Enter heading" className={inputClass()} /></Field>
+        <Field label="Guarantee text"><textarea value={section("guarantee").body || ""} onChange={(event) => updateSection("guarantee", { body: event.target.value })} placeholder="Enter content" className={textareaClass()} /></Field>
+        <Field label="Shipping heading"><input value={section("shipping").heading || ""} onChange={(event) => updateSection("shipping", { heading: event.target.value })} placeholder="Enter heading" className={inputClass()} /></Field>
+        <Field label="Shipping text"><textarea value={section("shipping").body || ""} onChange={(event) => updateSection("shipping", { body: event.target.value })} placeholder="Enter content" className={textareaClass()} /></Field>
+        <Field label="Contact heading"><input value={section("contact").heading || ""} onChange={(event) => updateSection("contact", { heading: event.target.value })} placeholder="Enter heading" className={inputClass()} /></Field>
+        <Field label="Contact text"><textarea value={section("contact").body || ""} onChange={(event) => updateSection("contact", { body: event.target.value })} placeholder="Enter content" className={textareaClass()} /></Field>
       </Section>
     </div>
   );
