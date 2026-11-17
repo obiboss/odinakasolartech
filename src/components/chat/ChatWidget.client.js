@@ -116,6 +116,7 @@ async function getSignedUrl(fullPath) {
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
+  const [started, setStarted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [bootError, setBootError] = useState("");
   const [conversationId, setConversationId] = useState(null);
@@ -280,10 +281,13 @@ export default function ChatWidget() {
 
   function handleButtonClick() {
     if (draggingRef.current) return;
+    setStarted(true);
     setOpen((v) => !v);
   }
 
   useEffect(() => {
+    if (!started) return undefined;
+
     let alive = true;
 
     (async () => {
@@ -329,7 +333,7 @@ export default function ChatWidget() {
     return () => {
       alive = false;
     };
-  }, [markDeliveredAsCustomer]);
+  }, [markDeliveredAsCustomer, started]);
 
   useEffect(() => {
     if (!conversationId) return;

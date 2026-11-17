@@ -1,0 +1,44 @@
+
+> odinaka-solar@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+✓ Compiled successfully in 33.6s
+  Running TypeScript ...
+  Collecting page data using 3 workers ...
+  Generating static pages using 3 workers (0/14) ...
+  Generating static pages using 3 workers (3/14) 
+  Generating static pages using 3 workers (6/14) 
+  Generating static pages using 3 workers (10/14) 
+✓ Generating static pages using 3 workers (14/14) in 3.8s
+  Finalizing page optimization ...
+
+Route (app)                  Revalidate  Expire
+┌ ○ /                                5m      1y
+├ ○ /_not-found
+├ ○ /about
+├ ƒ /admin
+├ ƒ /api/orders
+├ ƒ /api/revalidate-product
+├ ƒ /api/search/products
+├ ○ /cart
+├ ○ /contact
+├ ○ /portal
+├ ○ /robots.txt
+├ ƒ /shop
+├ ƒ /shop/[slug]
+├ ƒ /shop/category/[slug]
+└ ƒ /sitemap.xml
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

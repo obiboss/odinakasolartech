@@ -60,6 +60,20 @@ function extractStoragePathFromPublicUrl(url) {
   return url.slice(idx + marker.length);
 }
 
+async function revalidateProductSlugs(slugs) {
+  const response = await fetch("/api/revalidate-product", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ slugs }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Product cache revalidation failed (HTTP ${response.status}).`,
+    );
+  }
+}
+
 function generateImageUploadPath(productId, ext) {
   const safeExt = ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "jpg";
   return `${productId}/${Date.now()}-${Math.random().toString(16).slice(2)}.${safeExt}`;
@@ -582,13 +596,7 @@ export default function ProductsPanel() {
       // The product route is ISR-backed. Refresh both the current slug and a
       // previous slug when an admin renames the product, without changing the
       // existing cart/order flow or making the whole app uncached.
-      await fetch("/api/revalidate-product", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          slugs: [slug, editingProduct?.slug],
-        }),
-      }).catch(() => {});
+      await revalidateProductSlugs([slug, editingProduct?.slug]);
 
       await loadAll();
       setSaving(false);
@@ -597,7 +605,7 @@ export default function ProductsPanel() {
     } catch (error) {
       setSaving(false);
       setUploading(false);
-      setErr(error?.message || "Product saved, but image upload failed.");
+      setErr(error?.message || "Product save or follow-up processing failed.");
     }
   }
 
@@ -645,9 +653,8 @@ export default function ProductsPanel() {
 
     const { error } = await supabase.from("products").delete().eq("id", id);
 
-    setSaving(false);
-
     if (error) {
+      setSaving(false);
       setErr(error.message);
       return;
     }
@@ -656,7 +663,20 @@ export default function ProductsPanel() {
       backToList();
     }
 
+    let revalidationError = null;
+    try {
+      await revalidateProductSlugs([target?.slug]);
+    } catch (revalidationFailure) {
+      revalidationError = revalidationFailure;
+    }
+
     await loadAll();
+    setSaving(false);
+    if (revalidationError) {
+      setErr(
+        `Product was deleted, but ${revalidationError.message || "cache revalidation failed."}`,
+      );
+    }
   }
 
   async function removeImage(imageRow) {

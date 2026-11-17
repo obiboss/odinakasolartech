@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { HOMEPAGE_CACHE_TAGS } from "@/lib/homepage-data.server";
 
 function validSlug(value) {
   const slug = String(value || "").trim();
@@ -49,11 +50,57 @@ export async function POST(request) {
       );
     }
 
+    const { data: changedProducts, error: productsError } = await supabase
+      .from("products")
+      .select("slug, category_id")
+      .in("slug", slugs);
+    if (productsError) throw productsError;
+
+    const categoryIds = [
+      ...new Set((changedProducts || []).map((product) => product.category_id).filter(Boolean)),
+    ];
+    let categories = [];
+    if (categoryIds.length) {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, slug, parent_id")
+        .in("id", categoryIds);
+      if (error) throw error;
+      categories = data || [];
+    }
+
+    const parentIds = [...new Set(categories.map((category) => category.parent_id).filter(Boolean))];
+    let parentCategories = [];
+    if (parentIds.length) {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, slug")
+        .in("id", parentIds);
+      if (error) throw error;
+      parentCategories = data || [];
+    }
+
+    const categorySlugs = [
+      ...new Set([...categories, ...parentCategories].map((category) => category.slug).filter(Boolean)),
+    ];
+
     for (const slug of slugs) {
       revalidatePath(`/shop/${slug}`);
+      revalidateTag(`catalog-product:${slug}`, "max");
     }
+    for (const categorySlug of categorySlugs) {
+      revalidatePath(`/shop/category/${categorySlug}`);
+      revalidateTag(`catalog-category:${categorySlug}`, "max");
+    }
+    revalidateTag("catalog-products", "max");
+    revalidateTag("catalog-categories", "max");
+    revalidateTag("catalog-shop-listings", "max");
+    revalidateTag(HOMEPAGE_CACHE_TAGS.specialOffers, "max");
+    revalidateTag(HOMEPAGE_CACHE_TAGS.featuredProducts, "max");
+    revalidateTag(HOMEPAGE_CACHE_TAGS.latestProducts, "max");
     revalidatePath("/shop");
     revalidatePath("/");
+    revalidatePath("/sitemap.xml");
 
     return NextResponse.json({ revalidated: true, slugs });
   } catch (error) {

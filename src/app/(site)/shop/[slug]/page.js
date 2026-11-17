@@ -1,8 +1,9 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Container from "@/components/ui/Container";
-import { createClient } from "@/lib/supabase/server";
+import { publicSupabase } from "@/lib/supabase/public.server";
 import { whatsappLink } from "@/lib/whatsapp";
 import { getStore } from "@/lib/content.server";
 import RelatedProducts from "@/components/shop/RelatedProducts.server";
@@ -47,8 +48,8 @@ function getAverageRating(reviews) {
   return Number((total / reviews.length).toFixed(1));
 }
 
-const getProductBySlug = cache(async (slug) => {
-  const supabase = await createClient();
+async function loadProductBySlug(slug) {
+  const supabase = publicSupabase;
   const { data, error } = await supabase.from("products").select(`
     id, name, slug, price, currency, description, short_description,
     in_stock, featured, active, specs, video_testimonial_url,
@@ -66,21 +67,52 @@ const getProductBySlug = cache(async (slug) => {
     return null;
   }
   return data;
-});
+}
 
-async function getRelatedProducts(categoryId, productId) {
+const getProductBySlug = cache(async (slug) =>
+  unstable_cache(
+    () => loadProductBySlug(slug),
+    ["catalog-product", slug],
+    {
+      revalidate: 300,
+      tags: ["catalog-products", `catalog-product:${slug}`],
+    },
+  )(),
+);
+
+async function loadRelatedProducts(categoryId, productId) {
   if (!categoryId) return [];
-  const supabase = await createClient();
+  const supabase = publicSupabase;
   const { data, error } = await supabase.from("products").select(`id, name, slug, price, currency, short_description, in_stock, images:product_images (id, image_url, sort_order)`).eq("active", true).eq("category_id", categoryId).neq("id", productId).order("created_at", { ascending: false }).order("sort_order", { foreignTable: "product_images", ascending: true }).limit(8);
   if (error) console.log("SUPABASE ERROR (related products):", error);
   return data || [];
 }
 
-async function getFeaturedProducts(productId) {
-  const supabase = await createClient();
+async function loadFeaturedProducts(productId) {
+  const supabase = publicSupabase;
   const { data, error } = await supabase.from("products").select(`id, name, slug, price, currency, short_description, in_stock, images:product_images (id, image_url, sort_order)`).eq("active", true).eq("featured", true).neq("id", productId).order("created_at", { ascending: false }).order("sort_order", { foreignTable: "product_images", ascending: true }).limit(10);
   if (error) console.log("SUPABASE ERROR (featured products):", error);
   return data || [];
+}
+
+function getRelatedProducts(categoryId, productId) {
+  if (!categoryId) return Promise.resolve([]);
+  return unstable_cache(
+    () => loadRelatedProducts(categoryId, productId),
+    ["catalog-related-products", categoryId, productId],
+    {
+      revalidate: 300,
+      tags: ["catalog-products", `catalog-category-id:${categoryId}`],
+    },
+  )();
+}
+
+function getFeaturedProducts(productId) {
+  return unstable_cache(
+    () => loadFeaturedProducts(productId),
+    ["catalog-featured-products", productId],
+    { revalidate: 300, tags: ["catalog-products"] },
+  )();
 }
 
 export async function generateMetadata({ params }) {

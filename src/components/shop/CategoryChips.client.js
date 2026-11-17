@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 function cx(...a) {
   return a.filter(Boolean).join(" ");
@@ -10,24 +9,14 @@ function cx(...a) {
 
 export default function CategoryChips({ categories = [] }) {
   const pathname = usePathname();
-  const router = useRouter();
 
   const isAllActive = pathname === "/shop";
-
-  useEffect(() => {
-    router.prefetch("/shop");
-
-    categories.forEach((category) => {
-      if (category?.slug) {
-        router.prefetch(`/shop/category/${category.slug}`);
-      }
-    });
-  }, [categories, router]);
 
   return (
     <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
       <Link
         href="/shop"
+        prefetch={false}
         className={cx(
           "cursor-pointer shrink-0 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold transition",
           isAllActive
@@ -48,6 +37,7 @@ export default function CategoryChips({ categories = [] }) {
           <Link
             key={category.id}
             href={href}
+            prefetch={false}
             className={cx(
               "cursor-pointer shrink-0 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold transition",
               isActive

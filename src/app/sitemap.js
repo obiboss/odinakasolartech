@@ -1,9 +1,11 @@
-import { createClient } from "@/lib/supabase/server";
+import { publicSupabase } from "@/lib/supabase/public.server";
 
 const SITE_URL = "https://www.odinakachukwusolartech.com";
 
+export const revalidate = 300;
+
 export default async function sitemap() {
-  const supabase = await createClient();
+  const supabase = publicSupabase;
 
   const { data: products, error: productsError } = await supabase
     .from("products")

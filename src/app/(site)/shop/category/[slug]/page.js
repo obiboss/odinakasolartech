@@ -1,9 +1,11 @@
+import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Container from "@/components/ui/Container";
 import ProductCard from "@/components/shop/ProductCard.client";
 import JsonLd from "@/components/seo/JsonLd";
-import { createClient } from "@/lib/supabase/server";
+import { publicSupabase } from "@/lib/supabase/public.server";
 import { normalizeProductRecord } from "@/lib/supabase/storage";
 
 export const revalidate = 300;
@@ -11,8 +13,8 @@ export const revalidate = 300;
 const SITE_URL = "https://www.odinakachukwusolartech.com";
 const BRAND_NAME = "Odinaka Solar Tech";
 
-async function getCategoryBySlug(slug) {
-  const supabase = await createClient();
+const getCategoryBySlug = cache(async (slug) => {
+  const supabase = publicSupabase;
 
   const { data, error } = await supabase
     .from("categories")
@@ -26,12 +28,12 @@ async function getCategoryBySlug(slug) {
   }
 
   return data;
-}
+});
 
-async function getCategoryById(id) {
+const getCategoryById = cache(async (id) => {
   if (!id) return null;
 
-  const supabase = await createClient();
+  const supabase = publicSupabase;
 
   const { data, error } = await supabase
     .from("categories")
@@ -45,10 +47,10 @@ async function getCategoryById(id) {
   }
 
   return data;
-}
+});
 
-async function getTopLevelCategories() {
-  const supabase = await createClient();
+const getTopLevelCategories = cache(async () => {
+  const supabase = publicSupabase;
 
   const { data, error } = await supabase
     .from("categories")
@@ -63,12 +65,12 @@ async function getTopLevelCategories() {
   }
 
   return data || [];
-}
+});
 
-async function getChildCategories(parentId) {
+const getChildCategories = cache(async (parentId) => {
   if (!parentId) return [];
 
-  const supabase = await createClient();
+  const supabase = publicSupabase;
 
   const { data, error } = await supabase
     .from("categories")
@@ -83,12 +85,12 @@ async function getChildCategories(parentId) {
   }
 
   return data || [];
-}
+});
 
-async function getSiblingCategories(parentId) {
+const getSiblingCategories = cache(async (parentId) => {
   if (!parentId) return [];
 
-  const supabase = await createClient();
+  const supabase = publicSupabase;
 
   const { data, error } = await supabase
     .from("categories")
@@ -103,11 +105,12 @@ async function getSiblingCategories(parentId) {
   }
 
   return data || [];
-}
+});
 
-async function getCategoryProducts(categoryId, childIds = []) {
-  const supabase = await createClient();
+const getCategoryProducts = cache(async (categoryId, childIdsKey = "") => {
+  const supabase = publicSupabase;
 
+  const childIds = childIdsKey ? childIdsKey.split(",") : [];
   const categoryIds = [categoryId, ...childIds];
 
   const { data, error } = await supabase
@@ -151,7 +154,7 @@ async function getCategoryProducts(categoryId, childIds = []) {
       ),
     }))
     .map(normalizeProductRecord);
-}
+});
 
 function buildMeta(categoryName, productCount) {
   return {
@@ -164,10 +167,49 @@ function buildCategoryUrl(slug) {
   return `${SITE_URL}/shop/category/${slug}`;
 }
 
+async function loadCategoryPageData(slug) {
+  const category = await getCategoryBySlug(slug);
+  if (!category) return null;
+
+  const [topCategories, parentCategory, childCategories] = await Promise.all([
+    getTopLevelCategories(),
+    getCategoryById(category.parent_id),
+    getChildCategories(category.id),
+  ]);
+  const siblingCategories = category.parent_id
+    ? await getSiblingCategories(category.parent_id)
+    : [];
+  const products = await getCategoryProducts(
+    category.id,
+    childCategories.map((child) => child.id).join(","),
+  );
+
+  return {
+    category,
+    topCategories,
+    parentCategory,
+    childCategories,
+    siblingCategories,
+    products,
+  };
+}
+
+const getCategoryPageData = cache(async (slug) =>
+  unstable_cache(
+    () => loadCategoryPageData(slug),
+    ["catalog-category", slug],
+    {
+      revalidate: 300,
+      tags: ["catalog-categories", "catalog-products", `catalog-category:${slug}`],
+    },
+  )(),
+);
+
 export async function generateMetadata({ params }) {
   const { slug } = await params;
 
-  const category = await getCategoryBySlug(slug);
+  const pageData = await getCategoryPageData(slug);
+  const category = pageData?.category;
 
   if (!category) {
     return {
@@ -179,12 +221,7 @@ export async function generateMetadata({ params }) {
     };
   }
 
-  const childCategories = await getChildCategories(category.id);
-
-  const products = await getCategoryProducts(
-    category.id,
-    childCategories.map((child) => child.id),
-  );
+  const products = pageData.products;
 
   const meta = buildMeta(category.name, products.length);
   const categoryUrl = buildCategoryUrl(category.slug);
@@ -224,26 +261,20 @@ export async function generateMetadata({ params }) {
 export default async function CategoryLandingPage({ params }) {
   const { slug } = await params;
 
-  const category = await getCategoryBySlug(slug);
-  if (!category) return notFound();
+  const pageData = await getCategoryPageData(slug);
+  if (!pageData) return notFound();
 
-  const [topCategories, parentCategory, childCategories] = await Promise.all([
-    getTopLevelCategories(),
-    getCategoryById(category.parent_id),
-    getChildCategories(category.id),
-  ]);
-
-  const siblingCategories = category.parent_id
-    ? await getSiblingCategories(category.parent_id)
-    : [];
+  const {
+    category,
+    topCategories,
+    parentCategory,
+    childCategories,
+    siblingCategories,
+    products,
+  } = pageData;
 
   const categoryNavItems =
     childCategories.length > 0 ? childCategories : siblingCategories;
-
-  const products = await getCategoryProducts(
-    category.id,
-    childCategories.map((child) => child.id),
-  );
 
   const meta = buildMeta(category.name, products.length);
   const categoryUrl = buildCategoryUrl(category.slug);
